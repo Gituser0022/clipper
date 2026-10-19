@@ -34,11 +34,18 @@ def select_segments(segments, seconds):
     into the first one where the clip should start."""
     if not segments:
         return [], 0.0
-    latest = segments[-1].end
-    target = max(segments[0].start, latest - seconds)
-    chosen = [s for s in segments if s.end > target]
-    offset = max(0.0, target - chosen[0].start)
-    return chosen, offset
+    return select_range(segments, segments[-1].end - seconds, segments[-1].end)
+
+
+def select_range(segments, start, end):
+    """Return the segments overlapping stream time [start, end), plus the offset
+    into the first one where the clip should start. `start` is clamped to what
+    is still buffered."""
+    start = max(segments[0].start, start) if segments else start
+    chosen = [s for s in segments if s.end > start and s.start < end]
+    if not chosen:
+        return [], 0.0
+    return chosen, max(0.0, start - chosen[0].start)
 
 
 class LiveRecorder:
@@ -164,17 +171,30 @@ class LiveRecorder:
         keep recording that long so the clip also includes what happens next."""
         if seconds_after > 0:
             time.sleep(seconds_after)
-        total = seconds_before + seconds_after
+        segs = self.segments()
+        if not segs:
+            raise RuntimeError("nothing buffered yet - wait a few seconds")
+        end = segs[-1].end
+        return self.clip_range(end - seconds_before - seconds_after, end, out_dir, name)
+
+    def stream_time(self):
+        """Stream time of the live edge (end of the newest finished segment)."""
+        segs = self.segments()
+        return segs[-1].end if segs else 0.0
+
+    def clip_range(self, start, end, out_dir=".", name=None) -> Path:
+        """Save stream time [start, end) from the buffer."""
         with self._lock:
-            chosen, offset = select_segments(self.segments(), total)
+            chosen, offset = select_range(self.segments(), start, end)
             if not chosen:
                 raise RuntimeError("nothing buffered yet - wait a few seconds")
+            duration = min(end, chosen[-1].end) - max(start, chosen[0].start)
             out_dir = Path(out_dir)
             out_dir.mkdir(parents=True, exist_ok=True)
             out = out_dir / f"{name or 'live_' + uuid.uuid4().hex[:8]}.mp4"
             concat = "concat:" + "|".join(str(s.path) for s in chosen)
             cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-                   "-ss", f"{offset:.3f}", "-i", concat, "-t", f"{total:.3f}",
+                   "-ss", f"{offset:.3f}", "-i", concat, "-t", f"{duration:.3f}",
                    "-map", "0:v:0?", "-map", "0:a:0?",
                    "-c", "copy", "-movflags", "+faststart", str(out)]
             proc = subprocess.run(cmd, capture_output=True, text=True)
