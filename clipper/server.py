@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import Annotated
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -52,12 +52,14 @@ jobs: dict[str, dict] = {}
 def _run_job(kind, label, fn):
     job_id = uuid.uuid4().hex[:8]
     job = {"id": job_id, "kind": kind, "label": label, "status": "running",
-           "created": time.time(), "file": None, "error": None}
+           "created": time.time(), "file": None, "error": None, "duration": None}
     jobs[job_id] = job
 
     def work():
         try:
-            job["file"] = Path(fn()).name
+            path = Path(fn())
+            job["file"] = path.name
+            job["duration"] = _media_duration(path)
             job["status"] = "done"
         except Exception as e:  # surfaced to the UI
             job["status"] = "error"
@@ -278,4 +280,97 @@ def get_clip(name: str):
     return FileResponse(_clip_path(name))
 
 
+# -- helpers for the web UI: link inspection and clip thumbnails ----------------------
+
+def _media_duration(path):
+    """Length of a media file in seconds, or None if ffprobe can't tell."""
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                              "-of", "default=nw=1:nk=1", str(path)],
+                             capture_output=True, text=True, timeout=15).stdout
+        return round(float(out.strip()), 2)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+# twitch.tv/<name> paths that are not channels.
+_TWITCH_NOT_CHANNELS = {"videos", "directory", "downloads", "settings", "search", "p", "jobs",
+                        "turbo", "subscriptions", "inventory", "wallet", "drops", "friends"}
+
+
+def _inspect_fast(url):
+    """Live links we can recognise without asking yt-dlp, else None."""
+    parsed = urlparse(url)
+    if parsed.scheme == "file":  # a local video (also what the highlights tests use)
+        path = Path(unquote(parsed.path))
+        return {"is_live": False, "title": path.name, "thumbnail": None, "youtube_id": None,
+                "duration": _media_duration(path) if path.is_file() else None}
+    host = (parsed.hostname or "").lower().removeprefix("www.").removeprefix("m.")
+    parts = [p for p in parsed.path.split("/") if p]
+    if host in ("youtube.com", "youtu.be") or host.endswith(".youtube.com"):
+        if parts and (parts[-1] == "live" or (len(parts) == 2 and parts[0] == "live")):
+            return {"is_live": True, "title": None, "duration": None, "thumbnail": None,
+                    "youtube_id": youtube_id(url)}
+    if host == "twitch.tv" and len(parts) == 1 and parts[0].lower() not in _TWITCH_NOT_CHANNELS:
+        return {"is_live": True, "title": parts[0], "duration": None, "thumbnail": None,
+                "youtube_id": None}
+    return None
+
+
+@app.get("/api/inspect")
+def inspect(url: Url):
+    """What a link points at, so the page can pick video or live mode."""
+    fast = _inspect_fast(url)
+    if fast:
+        return fast
+    import json
+    try:
+        proc = subprocess.run(["yt-dlp", *base_args(), "--dump-single-json", "--skip-download",
+                               "--no-playlist", "--no-warnings", url],
+                              capture_output=True, text=True, timeout=45)
+    except subprocess.TimeoutExpired:
+        raise HTTPException(504, "timed out looking up the link")
+    try:
+        info = json.loads(proc.stdout) if proc.returncode == 0 else None
+    except ValueError:
+        info = None
+    if not isinstance(info, dict):
+        raise HTTPException(400, (proc.stderr.strip().splitlines() or ["couldn't read that link"])[-1])
+    vid = youtube_id(url)
+    if not vid and info.get("extractor_key") == "Youtube":
+        vid = info.get("id")
+    return {"is_live": bool(info.get("is_live")) or info.get("live_status") == "is_live",
+            "title": info.get("title"), "duration": info.get("duration"),
+            "thumbnail": info.get("thumbnail"), "youtube_id": vid}
+
+
+THUMBS = ".thumbs"
+
+
+@app.get("/clips/{name}/thumb.jpg")
+def clip_thumb(name: str):
+    """One frame of a clip (cached in clips/.thumbs) for the gallery."""
+    path = _clip_path(name)
+    thumb = path.parent / THUMBS / f"{path.name}.jpg"
+    if not thumb.is_file() or thumb.stat().st_mtime < path.stat().st_mtime:
+        thumb.parent.mkdir(exist_ok=True)
+        length = _media_duration(path) or 0
+        # About 10% in (at least 1s), then ffmpeg's `thumbnail` filter picks the most
+        # typical of the next frames, which skips black or blurry ones.
+        at = max(1.0, length * 0.1) if length > 3 else length / 2
+        tmp = thumb.with_name(f"{thumb.name}.{uuid.uuid4().hex[:6]}.jpg")
+        try:
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{at:.2f}", "-i", str(path),
+                            "-frames:v", "1", "-vf", "thumbnail=30,scale='min(640,iw)':-2", "-q:v", "4", str(tmp)],
+                           capture_output=True, timeout=30, check=True)
+            tmp.replace(thumb)
+        except (OSError, subprocess.SubprocessError):
+            tmp.unlink(missing_ok=True)
+            raise HTTPException(404, "no thumbnail")
+    return FileResponse(thumb, media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
+
+
+from .highlights_api import router as highlights_router  # noqa: E402 (needs app's helpers)
+
+app.include_router(highlights_router)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

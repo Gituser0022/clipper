@@ -19,4 +19,4 @@ build-backend = "setuptools.build_meta"
 packages = ["clipper"]
 
 [tool.setuptools.package-data]
-clipper = ["static/*"]
+clipper = ["static/*", "static/fonts/*", "static/js/*"]
