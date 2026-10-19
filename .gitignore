@@ -3,3 +3,12 @@ clips/
 __pycache__/
 *.egg-info/
 .pytest_cache/
+# Clipper's own files (clips, downloads, settings, the built app)
+/Clips/
+/Highlights/
+/Downloads/
+/Logs/
+/.work/
+/settings.json
+/settings.tmp
+/Clipper.app/

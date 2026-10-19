@@ -42,12 +42,12 @@ def video_size(path):
 def test_parser_defaults_keep_old_behaviour():
     p = cli.build_parser()
     a = p.parse_args(["vod", "u", "--start", "1:00", "--end", "1:30"])
-    assert (a.precise, a.vertical, a.focus, a.out) == (False, False, 0.5, "clips")
+    assert (a.precise, a.vertical, a.focus, a.out) == (False, False, 0.5, None)  # None = Clips/
     a = p.parse_args(["live", "u"])
-    assert (a.buffer, a.seconds, a.out, a.vertical, a.auto) == (300, 30, "clips", False, False)
+    assert (a.buffer, a.seconds, a.out, a.vertical, a.auto) == (300, 30, None, False, False)
     assert (a.loud, a.chat, a.before, a.after, a.loud_db) == (True, True, 60, 60, 8.0)
     a = p.parse_args(["serve"])
-    assert (a.host, a.port, a.data) == ("127.0.0.1", 8000, "data")
+    assert (a.host, a.port, a.home, a.data) == ("127.0.0.1", 8000, None, None)
 
 
 def test_parser_new_flags():
@@ -226,7 +226,7 @@ def test_make_app_bundle(tmp_path):
     assert text.startswith("#!/bin/bash\n")
     assert "REPO=" + str(repo).replace(" ", "\\ ") in text
     assert 'export PATH="/opt/homebrew/bin:/usr/local/bin:' in text
-    assert "Library/Logs/Clipper.log" in text and "nohup" in text
+    assert "/Logs/Clipper.log" in text and "nohup" in text and 'CLIPPER_HOME="$REPO"' in text
     subprocess.run(["bash", "-n", str(launcher)], check=True)
 
     # Rebuilding replaces the bundle in place.
@@ -291,8 +291,8 @@ def test_launcher_starts_server_once_and_opens_page(tmp_path):
         assert time.time() - t0 < 15
         assert (tmp_path / "open").read_text().split() == [f"http://localhost:{port}"]
         args = (tmp_path / "clipper-args").read_text().splitlines()
-        assert args == [f"serve --host 127.0.0.1 --port {port} --data {repo}/data"]
-        assert (tmp_path / "home" / "Library" / "Logs" / "Clipper.log").exists()
+        assert args == [f"serve --host 127.0.0.1 --port {port}"]
+        assert (repo / "Logs" / "Clipper.log").exists()
 
         # Second launch: server already answers, so just reopen the page.
         subprocess.run([str(launcher)], env=env, check=True, timeout=30)
@@ -314,5 +314,12 @@ def test_launcher_alerts_when_server_dies(tmp_path):
     assert proc.returncode == 1
     assert "Clipper.log" in (tmp_path / "osascript").read_text()
     assert not (tmp_path / "open").exists()
-    log = tmp_path / "home" / "Library" / "Logs" / "Clipper.log"
+    log = repo / "Logs" / "Clipper.log"
     assert "boom: no ffmpeg" in log.read_text()
+
+
+def test_clips_folder_defaults_to_home_clips(monkeypatch, tmp_path):
+    from clipper.cli import build_parser, clips_folder
+    monkeypatch.setenv("CLIPPER_HOME", str(tmp_path))
+    assert clips_folder(build_parser().parse_args(["vod", "u", "--start", "0", "--end", "5"])) == tmp_path / "Clips"
+    assert clips_folder(build_parser().parse_args(["live", "u", "--out", "x"])) == "x"

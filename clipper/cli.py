@@ -19,9 +19,19 @@ import threading
 from pathlib import Path
 
 
+def clips_folder(args):
+    """Where CLI clips go: --out, else the Clips folder of Clipper's home."""
+    from .storage import FOLDERS, default_home
+    return args.out or default_home() / FOLDERS["clips"]
+
+
 def cmd_serve(args):
     import uvicorn
-    os.environ["CLIPPER_DATA"] = str(Path(args.data).resolve())
+    if args.data:
+        print("--data is no longer used; use --home (files go in Clips/, Downloads/ ...).",
+              file=sys.stderr)
+    if args.home:
+        os.environ["CLIPPER_HOME"] = str(Path(args.home).expanduser().resolve())
     uvicorn.run("clipper.server:app", host=args.host, port=args.port, access_log=False)
 
 
@@ -37,7 +47,7 @@ def to_vertical(path, focus):
 def cmd_vod(args):
     from .vod import clip_vod
     print("Downloading clip…", file=sys.stderr)
-    path = clip_vod(args.url, args.start, args.end, args.out, precise=args.precise)
+    path = clip_vod(args.url, args.start, args.end, clips_folder(args), precise=args.precise)
     if args.vertical:
         print("Making 9:16 version…", file=sys.stderr)
         path = to_vertical(path, args.focus)
@@ -68,7 +78,7 @@ def background_submit(label, fn):
 
 def start_auto(rec, args):
     from .auto import AutoClipper
-    auto = AutoClipper(rec, args.out, submit=background_submit, audio=args.loud,
+    auto = AutoClipper(rec, clips_folder(args), submit=background_submit, audio=args.loud,
                        chat=args.chat, before=args.before, after=args.after,
                        vertical=args.vertical, loud_db=args.loud_db).start()
     kinds = [k for k, on in (("loud moments", args.loud), ("busy chat", args.chat)) if on]
@@ -95,7 +105,7 @@ def cmd_live(args):
                 print(f"Recorder {rec.status}: {rec.error or ''}", file=sys.stderr)
             try:
                 seconds = float(line) if line else args.seconds
-                path = rec.clip(seconds, out_dir=args.out)
+                path = rec.clip(seconds, out_dir=clips_folder(args))
                 print(to_vertical(path, args.focus) if args.vertical else path)
             except Exception as e:
                 print(f"Clip failed: {e}", file=sys.stderr)
@@ -121,14 +131,16 @@ def build_parser():
     s = sub.add_parser("serve", help="run the web UI")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
-    s.add_argument("--data", default="data", help="where clips and buffers are stored")
+    s.add_argument("--home", help="folder for Clips/, Highlights/, Downloads/ and Logs/ "
+                                  "(default: the Clipper folder itself)")
+    s.add_argument("--data", help=argparse.SUPPRESS)  # old option, ignored
     s.set_defaults(fn=cmd_serve)
 
     v = sub.add_parser("vod", help="clip a section of a finished video")
     v.add_argument("url")
     v.add_argument("--start", required=True)
     v.add_argument("--end", required=True)
-    v.add_argument("--out", default="clips")
+    v.add_argument("--out", help="folder to save in (default: Clips/ in Clipper's folder)")
     v.add_argument("--precise", action="store_true", help="frame-accurate cut (re-encodes)")
     add_vertical_args(v, "save only a 9:16 (1080x1920) version")
     v.set_defaults(fn=cmd_vod)
@@ -137,7 +149,7 @@ def build_parser():
     l.add_argument("url")
     l.add_argument("--buffer", type=int, default=300, help="seconds of rewind to keep")
     l.add_argument("--seconds", type=float, default=30, help="default clip length")
-    l.add_argument("--out", default="clips")
+    l.add_argument("--out", help="folder to save in (default: Clips/ in Clipper's folder)")
     add_vertical_args(l, "save clips as 9:16 (1080x1920)")
     l.add_argument("--auto", action="store_true",
                    help="also clip loud moments and chat spikes automatically")

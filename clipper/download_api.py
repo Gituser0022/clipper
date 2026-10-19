@@ -58,7 +58,7 @@ def start_download(req: DownloadRequest):
             label += f" (#{item})"
 
         def fn(report, item=item):
-            return download(req.url, req.choice, srv.CLIPS_DIR, item, req.browser, report)
+            return download(req.url, req.choice, srv.DOWNLOADS_DIR, item, req.browser, report)
 
         jobs.append(srv._run_job("download", label, fn, reports=True))
     return {"jobs": jobs}

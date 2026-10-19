@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build Clipper.app, a double-clickable launcher for the Clipper web UI (macOS).
 #
-#   bash scripts/make-mac-app.sh                  # -> ~/Applications/Clipper.app
+#   bash scripts/make-mac-app.sh                  # -> <this folder>/Clipper.app
 #   APP_DIR=/some/folder bash scripts/...         # -> /some/folder/Clipper.app
 #
 # The app starts `clipper serve` in the background (if it isn't running yet)
@@ -11,7 +11,8 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 CLIPPER="$REPO/.venv/bin/clipper"
-APP_DIR="${APP_DIR:-$HOME/Applications}"
+# Everything Clipper makes lives in this folder, the app included.
+APP_DIR="${APP_DIR:-$REPO}"
 case "$APP_DIR" in
   *.app) APP="$APP_DIR" ;;
   *) APP="$APP_DIR/Clipper.app" ;;
@@ -73,7 +74,7 @@ LAUNCHER="$APP/Contents/MacOS/Clipper"
 PORT="${CLIPPER_PORT:-8000}"
 URL="http://localhost:$PORT"
 PROBE="http://127.0.0.1:$PORT/api/jobs"
-LOG="$HOME/Library/Logs/Clipper.log"
+LOG="$REPO/Logs/Clipper.log"
 CLIPPER="$REPO/.venv/bin/clipper"
 # Apps started from Finder don't get the shell's PATH: add Homebrew (ffmpeg,
 # node) and the venv (yt-dlp).
@@ -95,7 +96,7 @@ if ! running; then
   mkdir -p "$(dirname "$LOG")"
   cd "$REPO" || { alert "Can't open $REPO"; exit 1; }
   printf '\n=== %s starting Clipper ===\n' "$(date)" >>"$LOG"
-  nohup "$CLIPPER" serve --host 127.0.0.1 --port "$PORT" --data "$REPO/data" \
+  CLIPPER_HOME="$REPO" nohup "$CLIPPER" serve --host 127.0.0.1 --port "$PORT" \
     >>"$LOG" 2>&1 </dev/null &
   pid=$!
   deadline=$((SECONDS + 20))
@@ -138,7 +139,8 @@ touch "$APP"
 
 cat <<EOF
 Built $APP
-  Runs:  $CLIPPER serve  (logs: ~/Library/Logs/Clipper.log, clips: $REPO/data/clips)
+  Runs:  $CLIPPER serve
+  Saves: $REPO/Clips, Highlights, Downloads (log: $REPO/Logs/Clipper.log)
 
 Open it:          double-click Clipper in Finder ($(dirname "$APP")), or: open $(printf '%q' "$APP")
                   If macOS blocks it the first time: right-click it -> Open -> Open

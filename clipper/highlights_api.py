@@ -122,7 +122,7 @@ def make_clips(analysis_id: str, req: ClipsRequest):
 
         def clip(start=m.start, end=m.end):
             with _clip_slots:
-                return clip_vod(a["url"], start, end, srv.CLIPS_DIR)
+                return clip_vod(a["url"], start, end, srv.HIGHLIGHTS_DIR)
 
         jobs.append(srv._run_job("highlight", f"{label} · {a['title']}",
                                  srv._vertical_after(clip, req.vertical)))
