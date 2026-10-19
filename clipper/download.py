@@ -123,6 +123,7 @@ def download(url, choice, out_dir, item=None, browser=None, report=lambda **kw: 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_download_command(url, choice, out_dir, item, browser)
+    already_there = {p.name for p in out_dir.iterdir()}  # yt-dlp skips files it already has
     report(stage="Waiting for another download")
     with _slots:
         report(progress=0.0, stage="Starting")
@@ -147,5 +148,5 @@ def download(url, choice, out_dir, item=None, browser=None, report=lambda **kw: 
         proc.wait()
     if proc.returncode != 0 or path is None:
         raise RuntimeError(_first_line_error("\n".join(log), "download failed"))
-    report(progress=1.0, stage="Done")
+    report(progress=1.0, stage="Already downloaded" if path.name in already_there else "Done")
     return path

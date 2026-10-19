@@ -69,7 +69,8 @@ function update(n, j) {
   if (n.status === j.status) return;
   n.status = j.status;
   n.el.className = `clip ${j.status}`;
-  const [kind, word] = { running: ["warn", j.kind === "download" ? "Downloading" : "Making"], done: ["ok", "Ready"],
+  const ready = j.stage === "Already downloaded" ? "Already downloaded" : "Ready";
+  const [kind, word] = { running: ["warn", j.kind === "download" ? "Downloading" : "Making"], done: ["ok", ready],
                          error: ["err", "Failed"] }[j.status] || ["", j.status];
   n.pill.className = `pill clip-pill ${kind}`; n.pill.textContent = word;
   if (j.status === "done") {

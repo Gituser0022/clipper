@@ -87,6 +87,11 @@ def _run_job(kind, label, fn, reports=False):
             job["folder"] = _folder_of(path)
             job["duration"] = _media_duration(path)
             job["status"] = "done"
+            # One card per file: a re-download replaces the older card for it.
+            for other_id, other in list(jobs.items()):
+                if (other_id != job_id and other["status"] == "done"
+                        and (other["folder"], other["file"]) == (job["folder"], job["file"])):
+                    jobs.pop(other_id, None)
             _make_room(keep=path)
         except Exception as e:  # surfaced to the UI
             job["status"] = "error"

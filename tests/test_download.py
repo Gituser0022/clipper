@@ -67,6 +67,9 @@ def test_download_video_and_audio(video_url, tmp_path):
     assert path.suffix == ".mp4" and path.parent == tmp_path and path.stat().st_size > 1000
     assert {"progress": 1.0, "stage": "Done"} in seen
     assert any(kw.get("stage") == "Downloading video" for kw in seen)
+    again = []
+    assert download(video_url, "compatible", tmp_path, report=lambda **kw: again.append(kw)) == path
+    assert again[-1] == {"progress": 1.0, "stage": "Already downloaded"}
     audio = download(video_url, "audio", tmp_path)
     assert audio.suffix == ".mp3"
     with pytest.raises(RuntimeError, match="404"):
@@ -96,3 +99,12 @@ def test_download_api(video_url, tmp_path, monkeypatch):
     assert job["status"] == "done", job["error"]
     assert job["progress"] == 1.0 and job["stage"] == "Done" and job["duration"] > 2
     assert client.get(f"/clips/{job['file']}").status_code == 200
+
+    # Same link again: yt-dlp skips it, the card says so, and only one card remains.
+    again = client.post("/api/download", json={"url": video_url, "choice": "compatible"}).json()["jobs"][0]
+    deadline = time.time() + 60
+    while again["status"] == "running" and time.time() < deadline:
+        time.sleep(0.3)
+        again = next(j for j in client.get("/api/jobs").json() if j["id"] == again["id"])
+    assert again["status"] == "done" and again["stage"] == "Already downloaded"
+    assert [j["id"] for j in client.get("/api/jobs").json() if j["file"] == job["file"]] == [again["id"]]
