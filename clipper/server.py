@@ -49,15 +49,25 @@ app = FastAPI(title="Clipper", lifespan=lifespan)
 jobs: dict[str, dict] = {}
 
 
-def _run_job(kind, label, fn):
+def _run_job(kind, label, fn, reports=False):
+    """Run fn in the background as a job the UI can follow. With reports=True,
+    fn is called as fn(report), where report(progress=0..1, stage="...")
+    updates the job while it runs."""
     job_id = uuid.uuid4().hex[:8]
     job = {"id": job_id, "kind": kind, "label": label, "status": "running",
-           "created": time.time(), "file": None, "error": None, "duration": None}
+           "created": time.time(), "file": None, "error": None, "duration": None,
+           "progress": None, "stage": None}
     jobs[job_id] = job
+
+    def report(progress=None, stage=None):
+        if progress is not None:
+            job["progress"] = round(min(1.0, max(0.0, progress)), 3)
+        if stage is not None:
+            job["stage"] = stage
 
     def work():
         try:
-            path = Path(fn())
+            path = Path(fn(report) if reports else fn())
             job["file"] = path.name
             job["duration"] = _media_duration(path)
             job["status"] = "done"
@@ -373,4 +383,7 @@ def clip_thumb(name: str):
 from .highlights_api import router as highlights_router  # noqa: E402 (needs app's helpers)
 
 app.include_router(highlights_router)
+from .download_api import router as download_router  # noqa: E402
+
+app.include_router(download_router)
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
