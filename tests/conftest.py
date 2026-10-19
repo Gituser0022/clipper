@@ -5,6 +5,10 @@ import pytest
 def clipper_home(tmp_path, monkeypatch):
     """Point every Clipper folder at a temporary home so tests never touch the real one."""
     import clipper.server as server
+    from clipper import remote
+    # Starlette's TestClient calls itself "testclient" at "testserver": count it as the Mac.
+    monkeypatch.setattr(remote, "LOCAL_CLIENTS", remote.LOCAL_CLIENTS | {"testclient"})
+    monkeypatch.setattr(remote, "LOCAL_HOST_NAMES", remote.LOCAL_HOST_NAMES | {"testserver"})
     home = tmp_path / "home"
     monkeypatch.setenv("CLIPPER_HOME", str(home))
     monkeypatch.setattr(server, "HOME", home)

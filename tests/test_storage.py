@@ -26,7 +26,9 @@ def test_default_home(monkeypatch, tmp_path):
 
 
 def test_settings_round_trip(tmp_path):
-    assert storage.load_settings(tmp_path) == {"storage_limit_gb": None, "when_full": "stop"}
+    assert storage.load_settings(tmp_path) == {"storage_limit_gb": None, "when_full": "stop",
+                                               "remote_enabled": False, "remote_key": None,
+                                               "after_phone_save": "bin"}
     storage.save_settings(tmp_path, {"storage_limit_gb": 20, "when_full": "delete_oldest"})
     assert storage.load_settings(tmp_path)["storage_limit_gb"] == 20
     (tmp_path / storage.SETTINGS_FILE).write_text("not json")

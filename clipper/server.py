@@ -12,15 +12,16 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from typing import Annotated, Literal
 from urllib.parse import parse_qs, unquote, urlparse
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from . import storage
+from . import remote, storage
 from .auto import AutoClipper
 from .edit import make_vertical
 from .live import LiveRecorder
@@ -60,6 +61,36 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Clipper", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def guard(request: Request, call_next):
+    """The Mac itself may do anything. Phones and iPads need the private key from
+    the Phone & iPad link, and can't quit Clipper, open Finder or read local files."""
+    client = request.client.host if request.client else ""
+    local = client in remote.LOCAL_CLIENTS
+    request.state.local = local
+    if local:
+        if remote.host_name(request.headers.get("host")) not in remote.LOCAL_HOST_NAMES:
+            return JSONResponse({"detail": "Open Clipper at http://localhost:8000"}, 403)
+        return await call_next(request)
+    settings = _settings()
+    key = settings["remote_key"] if settings["remote_enabled"] else None
+    given = request.query_params.get("key")
+    if given is not None and remote.same_key(given, key):
+        resp = RedirectResponse("/", 303)
+        resp.set_cookie(remote.COOKIE, key, max_age=remote.COOKIE_DAYS * 86400,
+                        httponly=True, samesite="lax")
+        return resp
+    if not remote.same_key(request.cookies.get(remote.COOKIE), key):
+        if request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": remote.NOT_CONNECTED}, 401)
+        return HTMLResponse(remote.NOT_CONNECTED_PAGE, 401)
+    if (request.method, request.url.path) in remote.LOCAL_ONLY:
+        return JSONResponse({"detail": "Only the Mac can do this."}, 403)
+    if request.query_params.get("url", "").lower().startswith("file:"):
+        return JSONResponse({"detail": "Local files can only be used on the Mac"}, 400)
+    return await call_next(request)
 jobs: dict[str, dict] = {}
 
 
@@ -306,9 +337,10 @@ def job_list():
 
 
 @app.get("/api/state")
-def state():
+def state(request: Request):
     """Everything the page polls for, in one request: recorders and jobs."""
-    return {"live": live_list(), "jobs": job_list(), "storage": storage_info()}
+    return {"live": live_list(), "jobs": job_list(), "storage": storage_info(),
+            "client": {"local": request.state.local}}
 
 
 # -- storage: one folder for everything, with a size limit ------------------------------
@@ -359,6 +391,13 @@ def _settings():
     return storage.load_settings(HOME)
 
 
+def _save_settings(**changes):
+    settings = _settings()
+    settings.update(changes)
+    storage.save_settings(HOME, settings)
+    _storage_cache.clear()
+
+
 def storage_info(fresh=False):
     """Usage, limit and folders. Cached for 5s because the page polls it."""
     if not fresh and _storage_cache.get("at", 0) > time.time() - 5:
@@ -379,6 +418,7 @@ def storage_info(fresh=False):
             "used": used, "limit_bytes": limit_bytes, "when_full": settings["when_full"],
             "disk_free_bytes": free,
             "full": bool(limit_bytes and used["total"] >= limit_bytes),
+            "can_trash": sys.platform == "darwin",
             "percent": round(min(1.0, used["total"] / limit_bytes), 4) if limit_bytes else None}
     _storage_cache.update(at=time.time(), info=info)
     return info
@@ -397,7 +437,20 @@ def _check_room():
                            f"the limit in Settings.")
 
 
-def _delete_file(path):
+def _move_to_bin(path):
+    """Move a file to the macOS Bin through Finder, so 'Put Back' works."""
+    proc = subprocess.run(["osascript", "-e", "on run argv",
+                           "-e", 'tell application "Finder" to delete (POSIX file (item 1 of argv) as alias)',
+                           "-e", "end run", str(path)], capture_output=True, text=True, timeout=30)
+    if proc.returncode != 0:
+        raise RuntimeError("macOS didn't let Clipper use the Bin. Allow Clipper (or Terminal) "
+                           "to control Finder in System Settings → Privacy & Security → "
+                           "Automation, then try again.")
+
+
+def _delete_file(path, trash=False):
+    if trash:
+        _move_to_bin(path)
     path.unlink(missing_ok=True)
     (path.parent / THUMBS / f"{path.name}.jpg").unlink(missing_ok=True)
     folder = _folder_of(path)
@@ -435,8 +488,7 @@ def get_storage():
 
 @app.put("/api/settings")
 def put_settings(req: SettingsRequest):
-    HOME.mkdir(parents=True, exist_ok=True)
-    storage.save_settings(HOME, req.model_dump())
+    _save_settings(**req.model_dump())
     _make_room()
     return storage_info(fresh=True)
 
@@ -461,13 +513,86 @@ def open_folder(req: OpenRequest):
 
 @app.delete("/api/clips/{name}")
 def delete_clip(name: str):
-    _delete_file(_clip_path(name))
-    return storage_info(fresh=True)
+    """Move a clip to the Bin on a Mac; elsewhere delete it."""
+    trash = sys.platform == "darwin"
+    try:
+        _delete_file(_clip_path(name), trash=trash)
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {**storage_info(fresh=True), "trashed": trash}
+
+
+def _after_phone_save(path, what):
+    """Runs once a phone or iPad has received the whole file."""
+    try:
+        if what == "bin" and sys.platform == "darwin":
+            _delete_file(path, trash=True)
+        elif what in ("bin", "delete"):
+            _delete_file(path)
+    except (OSError, RuntimeError):
+        pass  # the Mac keeps its copy; nothing is lost
+    _storage_cache.clear()
 
 
 @app.get("/clips/{name}")
-def get_clip(name: str):
-    return FileResponse(_clip_path(name))
+def get_clip(name: str, request: Request, save: bool = False):
+    """Serve a clip. With ?save=1 from a phone or iPad, it downloads as a file and,
+    once all of it has been sent, the Mac's copy is handled per 'after_phone_save'."""
+    path = _clip_path(name)
+    if not save:
+        return FileResponse(path)
+    what = _settings()["after_phone_save"]
+    background = None
+    if not request.state.local and what != "keep":
+        background = BackgroundTask(_after_phone_save, path, what)
+    return FileResponse(path, filename=path.name, background=background)
+
+
+# -- phone & iPad access ------------------------------------------------------------------
+
+def _remote_info(request):
+    if not request.state.local:
+        return {"local": False, "enabled": True, "after_phone_save": _settings()["after_phone_save"]}
+    s = _settings()
+    enabled = bool(s["remote_enabled"] and s["remote_key"])
+    urls = remote.links(request.url.port or 8000, s["remote_key"]) if enabled else []
+    listen = os.environ.get("CLIPPER_LISTEN_HOST", "127.0.0.1")
+    return {"local": True, "enabled": enabled, "urls": urls,
+            "qr_svg": remote.qr_svg(urls[0]) if urls else None,
+            "reachable": listen not in ("127.0.0.1", "localhost", "::1"),
+            "after_phone_save": s["after_phone_save"]}
+
+
+class RemoteRequest(BaseModel):
+    enabled: bool
+
+
+class PhoneSaveRequest(BaseModel):
+    after_phone_save: Literal["bin", "delete", "keep"]
+
+
+@app.get("/api/remote")
+def get_remote(request: Request):
+    return _remote_info(request)
+
+
+@app.put("/api/remote")
+def put_remote(req: RemoteRequest, request: Request):
+    key = _settings()["remote_key"] or remote.new_key()
+    _save_settings(remote_enabled=req.enabled, remote_key=key)
+    return _remote_info(request)
+
+
+@app.post("/api/remote/new-link")
+def new_remote_link(request: Request):
+    _save_settings(remote_key=remote.new_key())
+    return _remote_info(request)
+
+
+@app.put("/api/remote/after-save")
+def put_after_save(req: PhoneSaveRequest, request: Request):
+    _save_settings(after_phone_save=req.after_phone_save)
+    return _remote_info(request)
 
 
 # -- helpers for the web UI: link inspection and clip thumbnails ----------------------

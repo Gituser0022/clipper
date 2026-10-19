@@ -30,6 +30,7 @@ def cmd_serve(args):
     if args.data:
         print("--data is no longer used; use --home (files go in Clips/, Downloads/ ...).",
               file=sys.stderr)
+    os.environ["CLIPPER_LISTEN_HOST"] = args.host  # lets the page say if phones can reach it
     if args.home:
         os.environ["CLIPPER_HOME"] = str(Path(args.home).expanduser().resolve())
     uvicorn.run("clipper.server:app", host=args.host, port=args.port, access_log=False)

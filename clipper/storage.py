@@ -14,7 +14,9 @@ FOLDERS = {"clips": "Clips", "highlights": "Highlights", "downloads": "Downloads
 SAVED = ("clips", "highlights", "downloads")  # what the storage limit applies to
 WORK = ".work"
 SETTINGS_FILE = "settings.json"
-DEFAULT_SETTINGS = {"storage_limit_gb": None, "when_full": "stop"}
+DEFAULT_SETTINGS = {"storage_limit_gb": None, "when_full": "stop",
+                    # Phone & iPad access (see remote.py)
+                    "remote_enabled": False, "remote_key": None, "after_phone_save": "bin"}
 MEDIA = {".mp4", ".mkv", ".webm", ".mov", ".mp3", ".m4a", ".opus", ".ogg", ".wav", ".flac"}
 GB = 1024 ** 3
 

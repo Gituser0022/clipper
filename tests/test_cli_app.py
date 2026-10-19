@@ -291,7 +291,7 @@ def test_launcher_starts_server_once_and_opens_page(tmp_path):
         assert time.time() - t0 < 15
         assert (tmp_path / "open").read_text().split() == [f"http://localhost:{port}"]
         args = (tmp_path / "clipper-args").read_text().splitlines()
-        assert args == [f"serve --host 127.0.0.1 --port {port}"]
+        assert args == [f"serve --host 0.0.0.0 --port {port}"]
         assert (repo / "Logs" / "Clipper.log").exists()
 
         # Second launch: server already answers, so just reopen the page.

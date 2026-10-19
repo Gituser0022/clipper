@@ -5,7 +5,7 @@ import time
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, StringConstraints
 
 from .highlights import find_moments, measure_levels, video_info
@@ -82,7 +82,9 @@ def _summary(a):
 
 
 @router.post("")
-def start_analysis(req: AnalyseRequest):
+def start_analysis(req: AnalyseRequest, request: Request):
+    if req.url.lower().startswith("file:") and not request.state.local:
+        raise HTTPException(400, "Local files can only be used on the Mac")
     a = {"id": uuid.uuid4().hex[:8], "url": req.url, "title": req.url, "duration": None,
          "youtube_id": _server().youtube_id(req.url), "status": "analyzing", "progress": 0.0,
          "error": None, "created": time.time(), "levels": []}

@@ -96,7 +96,9 @@ if ! running; then
   mkdir -p "$(dirname "$LOG")"
   cd "$REPO" || { alert "Can't open $REPO"; exit 1; }
   printf '\n=== %s starting Clipper ===\n' "$(date)" >>"$LOG"
-  CLIPPER_HOME="$REPO" nohup "$CLIPPER" serve --host 127.0.0.1 --port "$PORT" \
+  # 0.0.0.0 so phones and iPads on the Wi-Fi can connect once that's turned on in
+  # Settings; until then, and without the private key, they're refused.
+  CLIPPER_HOME="$REPO" nohup "$CLIPPER" serve --host 0.0.0.0 --port "$PORT" \
     >>"$LOG" 2>&1 </dev/null &
   pid=$!
   deadline=$((SECONDS + 20))
