@@ -3,6 +3,9 @@ import { $, api, post, el, setText, setHidden, setClass, setStyle, setAttr, clam
          trackJobs, untrack, kick, go, smooth, isStopped, rememberTitle } from "./core.js";
 import { player, onPlayerChange, loadPlayer, resetPlayer, playRange } from "./player.js";
 import { setVideo } from "./highlights.js";
+import { downloader } from "./download.js";
+
+const dl = downloader($("makeDl"), { preview: false });  // step 2 already shows the video
 
 let linkUrl = "", info = null, kind = null, pickedKind = null, method = "best", inspectSeq = 0;
 export const state = { get kind() { return kind; }, get method() { return method; } };
@@ -42,6 +45,7 @@ export function resetLink() {
   setClass($("step1"), "done", false);
   for (const id of ["step2", "step3"]) setHidden($(id), true);
   setHidden($("explain"), false);
+  dl.reset();
 }
 // Continue re-checks the same link only if looking it up failed.
 $("linkForm").onsubmit = (e) => { e.preventDefault(); inspectLink(!!info?.error); };
@@ -67,11 +71,13 @@ for (const r of document.querySelectorAll('input[name="kind"]')) r.addEventListe
 
 function setMethod(m) {
   method = m;
-  $("methodBest").checked = m === "best"; $("methodManual").checked = m === "manual";
+  $("methodBest").checked = m === "best"; $("methodManual").checked = m === "manual"; $("methodDownload").checked = m === "download";
   const on = kind === "video" && !!linkUrl;
   setHidden($("step3"), !on);
   setHidden($("bestPanel"), m !== "best"); setHidden($("manualPanel"), m !== "manual");
-  setText($("step3Title"), m === "best" ? "Find the best moments" : "Choose the part to keep");
+  setHidden($("downloadPanel"), m !== "download"); setHidden($("playerBox"), m === "download");
+  setText($("step3Title"), { best: "Find the best moments", manual: "Choose the part to keep", download: "Download the whole video" }[m]);
+  if (on && m === "download") { dl.load(linkUrl); return; }
   if (on) {
     loadPlayer(linkUrl);
     if (m === "best") setVideo(linkUrl, info && !info.is_live ? info.duration : 0);

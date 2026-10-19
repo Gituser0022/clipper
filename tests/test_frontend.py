@@ -25,7 +25,9 @@ def client(tmp_path, monkeypatch):
 # -- /api/state -------------------------------------------------------------------------
 
 def test_state_combines_live_and_jobs(client):
-    assert client.get("/api/state").json() == {"live": [], "jobs": []}
+    first = client.get("/api/state").json()
+    assert first["live"] == [] and first["jobs"] == []
+    assert {"used", "limit_bytes", "full"} <= set(first.get("storage") or {})  # the page's storage pill and banners
 
     now = time.time()
     server.jobs["a"] = {"id": "a", "kind": "vod", "label": "old", "status": "done",
@@ -207,3 +209,36 @@ def test_static_files_are_served(client):
     for path in ("/app.css", "/js/main.js", "/fonts/pacifico-latin.woff2"):
         assert client.get(path).status_code == 200, path
     assert "javascript" in client.get("/js/main.js").headers["content-type"]
+
+
+def test_script_class_hooks_exist():
+    """Templates are filled in by class name (q(".x")); every such class must exist in the page."""
+    _, html, js = page_sources()
+    classes = set()
+    for names in re.findall(r'\bclass="([^"]+)"', html):
+        classes |= set(names.split())
+    used = set()
+    for src in js.values():
+        for sel in re.findall(r'\bq\("([^"]+)"\)', src):
+            used |= set(re.findall(r"\.([\w-]+)", sel))
+    assert used and used <= classes, used - classes
+
+
+def test_download_page_is_wired():
+    _, html, js = page_sources()
+    assert 'data-view="download"' in html and 'id="view-download"' in html and 'id="dlTpl"' in html
+    assert 'value="download"' in html  # the third choice in Make a clip
+    assert "/api/download/inspect" in js["download.js"] and '"/api/download"' in js["download.js"]
+    assert "Only download videos you own or have permission to save." in html
+    for b in ("chrome", "safari", "firefox", "edge", "brave"):
+        assert f'value="{b}"' in html
+
+
+def test_storage_settings_are_wired():
+    _, html, js = page_sources()
+    src = js["storage.js"]
+    for needle in ('"/api/storage"', '"/api/settings"', '"/api/storage/open"', "storage_limit_gb", "when_full"):
+        assert needle in src, needle
+    assert 'value="stop"' in html and 'value="delete_oldest"' in html
+    assert html.count('class="full-banner') == 3  # Make a clip, Download, Recording
+    assert "/api/clips/" in js["clips.js"] and 'method: "DELETE"' in js["clips.js"]

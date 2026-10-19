@@ -24,12 +24,17 @@
       </a>
       <nav class="nav" aria-label="Pages">
         <a href="#/make" data-view="make"><span class="nav-ico" aria-hidden="true">✂</span><span>Make a clip</span></a>
+        <a href="#/download" data-view="download"><span class="nav-ico" aria-hidden="true">↓</span><span>Download</span></a>
         <a href="#/recording" data-view="recording"><span class="tally" id="navRecDot" aria-hidden="true"></span><span>Recording</span><span class="badge rec" id="navRec" hidden></span></a>
         <a href="#/clips" data-view="clips"><span class="nav-ico" aria-hidden="true">▦</span><span>My clips</span><span class="badge" id="navClips" hidden></span></a>
       </nav>
       <span class="offline" id="offline" role="status" hidden>Can't reach Clipper — retrying…</span>
-      <button type="button" class="btn quiet sm icon theme-btn quit" id="themeBtn" aria-label="Colour theme: automatic" title="Colour theme: automatic"></button>
-      <button type="button" class="btn quiet sm" id="quit" title="Stop Clipper and all recordings">Quit</button>
+      <div class="appbar-right">
+        <button type="button" class="pill storage-pill" id="storagePill" hidden></button>
+        <button type="button" class="btn quiet sm icon" id="settingsBtn" aria-label="Storage and settings" title="Storage and settings"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button type="button" class="btn quiet sm icon theme-btn" id="themeBtn" aria-label="Colour theme: automatic" title="Colour theme: automatic"></button>
+        <button type="button" class="btn quiet sm" id="quit" title="Stop Clipper and all recordings">Quit</button>
+      </div>
     </div>
   </header>
 
@@ -40,6 +45,10 @@
         <p class="eyebrow">New clip</p>
         <h1 id="makeTitle">Make a clip</h1>
         <p>Paste a link, choose what you want, and Clipper does the rest.</p>
+      </div>
+      <div class="full-banner callout warn" role="status" hidden>
+        <p><b>Storage is full</b> — new clips won't be saved. Free up space or raise the limit.</p>
+        <button type="button" class="btn sm" data-open-settings>Storage settings</button>
       </div>
 
       <ol class="steps">
@@ -95,6 +104,14 @@
                 <span class="method-text">
                   <b>Choose the start and end myself</b>
                   <span>Drag two handles on a timeline to keep exactly the part you want.</span>
+                </span>
+              </label>
+              <label class="method">
+                <input type="radio" name="method" value="download" id="methodDownload">
+                <span class="method-art download" aria-hidden="true"><i></i></span>
+                <span class="method-text">
+                  <b>Download the whole video</b>
+                  <span>Save all of it, or just the sound. Good for posts that are already short, like Instagram or X.</span>
                 </span>
               </label>
             </div>
@@ -206,6 +223,9 @@
               </div>
             </div>
 
+            <!-- download the whole thing -->
+            <div id="downloadPanel" hidden><div id="makeDl"></div></div>
+
             <!-- choose start and end -->
             <div id="manualPanel" hidden>
               <div class="timeline unknown" id="tl">
@@ -253,8 +273,47 @@
           <div class="ex"><span class="ex-ico" aria-hidden="true">🔊</span><b>Best moments from a video</b><span>Paste a video and get its loudest moments as separate clips.</span></div>
           <div class="ex"><span class="ex-ico" aria-hidden="true">✂</span><b>Your own start and end</b><span>Pick the exact part of a video to keep.</span></div>
           <div class="ex"><span class="ex-ico rec" aria-hidden="true"></span><b>Clips from a live stream</b><span>Clipper records in the background. Save the last 30 seconds with one click.</span></div>
+          <a class="ex ex-link" href="#/download"><span class="ex-ico" aria-hidden="true">↓</span><b>Download a whole video</b><span>From X, Instagram, TikTok, YouTube and more, or just the sound.</span></a>
         </div>
       </div>
+    </section>
+
+    <!-- ============================== DOWNLOAD ============================== -->
+    <section class="view" id="view-download" aria-labelledby="dlTitle" hidden>
+      <div class="page-head center">
+        <p class="eyebrow">Save</p>
+        <h1 id="dlTitle">Download</h1>
+        <p>Save a whole video, or just its sound, from YouTube, X, Instagram, TikTok, Facebook, Reddit, Twitch, Vimeo and many more.</p>
+      </div>
+      <div class="full-banner callout warn" role="status" hidden>
+        <p><b>Storage is full</b> — new clips won't be saved. Free up space or raise the limit.</p>
+        <button type="button" class="btn sm" data-open-settings>Storage settings</button>
+      </div>
+      <ol class="steps">
+        <li class="step" id="dlStep1">
+          <div class="step-num" aria-hidden="true"><span>1</span></div>
+          <div class="step-card">
+            <p class="eyebrow">Step 1</p>
+            <h2>Paste a link</h2>
+            <p class="step-sub">A post, a video or a playlist. If it holds several videos, you can pick which ones.</p>
+            <form class="linkbar" id="dlForm" novalidate>
+              <label for="dlLink" class="sr-only">Link to download</label>
+              <input id="dlLink" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://x.com/… or https://www.instagram.com/p/…">
+              <button type="button" class="btn quiet icon" id="dlClear" aria-label="Clear the link">✕</button>
+              <button type="submit" class="btn primary lg" id="dlGo">Continue <span aria-hidden="true">→</span></button>
+            </form>
+            <div class="msg" id="dlLinkMsg" role="alert"></div>
+          </div>
+        </li>
+        <li class="step" id="dlStep2" hidden>
+          <div class="step-num" aria-hidden="true"><span>2</span></div>
+          <div class="step-card">
+            <p class="eyebrow">Step 2</p>
+            <h2>Choose what to save</h2>
+            <div id="dlPanel"></div>
+          </div>
+        </li>
+      </ol>
     </section>
 
     <!-- ============================== RECORDING ============================== -->
@@ -263,6 +322,10 @@
         <p class="eyebrow">Live</p>
         <h1 id="recTitle">Recording</h1>
         <p id="recHint">When something happens, press a button. Clipper saves what <em>already</em> happened. Press <kbd>C</kbd> to save the last 30 seconds.</p>
+      </div>
+      <div class="full-banner callout warn" role="status" hidden>
+        <p><b>Storage is full</b> — new clips won't be saved. Free up space or raise the limit.</p>
+        <button type="button" class="btn sm" data-open-settings>Storage settings</button>
       </div>
       <div class="monitors" id="recorders"></div>
       <div class="empty" id="recEmpty">
@@ -278,7 +341,7 @@
       <div class="page-head">
         <p class="eyebrow">Library</p>
         <h1 id="clipsTitle">My clips</h1>
-        <p id="clipCount"></p>
+        <div class="clips-sub"><p id="clipCount"></p><button type="button" class="pill storage-pill" data-open-settings id="clipsStorage" hidden></button></div>
       </div>
       <div class="clips" id="clips"></div>
       <div class="empty" id="clipsEmpty">
@@ -301,12 +364,68 @@
 
 <dialog id="viewer" aria-labelledby="viewerTitle">
   <video id="viewerVideo" controls playsinline preload="none"></video>
+  <div class="viewer-audio" id="viewerAudioBox" hidden>
+    <span class="viewer-wave" aria-hidden="true"><svg viewBox="0 0 64 32"><path d="M2 16h4M10 10v12M16 4v24M22 12v8M28 7v18M34 2v28M40 9v14M46 13v6M52 6v20M58 11v10M62 16h0"/></svg></span>
+    <audio id="viewerAudio" controls preload="none"></audio>
+  </div>
+  <p class="viewer-note" id="viewerNote" hidden>This browser can't play this file. Download it and open it in QuickTime or VLC.</p>
   <div class="viewer-bar">
     <div class="viewer-title" id="viewerTitle"></div>
     <a class="btn sm" id="viewerDl" download>↓ Download</a>
     <button type="button" class="btn sm" id="viewerVert">Make 9:16</button>
     <button type="button" class="btn sm quiet" id="viewerClose">✕ Close</button>
   </div>
+</dialog>
+
+<dialog id="settingsDlg" aria-labelledby="stTitle">
+  <div class="st">
+    <div class="st-head">
+      <div><p class="eyebrow">Settings</p><h2 id="stTitle">Storage</h2></div>
+      <button type="button" class="btn quiet sm icon" id="stClose" aria-label="Close">✕</button>
+    </div>
+    <div class="st-usage">
+      <div class="st-big"><span class="mono" id="stUsed">–</span><span id="stOf"></span><span class="grow"></span><span class="pill" id="stState"></span></div>
+      <div class="meter" id="stMeter" role="meter" aria-label="Storage used" aria-valuemin="0" aria-valuemax="100"><i></i></div>
+      <div class="st-free" id="stFree"></div>
+    </div>
+    <div class="st-section">
+      <div class="label">Where Clipper saves things</div>
+      <div class="st-main"><span class="mono" id="stFolder"></span><span class="grow"></span><button type="button" class="btn sm" id="stOpenMain">Show in Finder</button></div>
+      <div class="st-rows" id="stRows"></div>
+    </div>
+    <div class="st-section">
+      <div class="label" id="stLimitLabel">How much Clipper may use</div>
+      <div class="st-limit">
+        <input class="input mono" id="stLimit" type="number" min="1" max="5000" step="1" inputmode="decimal" aria-labelledby="stLimitLabel">
+        <span class="st-unit">GB</span>
+        <label class="toggle"><input type="checkbox" id="stNoLimit"><span class="sw" aria-hidden="true"></span><span>No limit</span></label>
+      </div>
+    </div>
+    <div class="st-section">
+      <div class="label" id="stWhenLabel">When it's full</div>
+      <div class="st-when" role="radiogroup" aria-labelledby="stWhenLabel">
+        <label class="st-opt"><input type="radio" name="stWhen" value="stop"><span><b>Stop saving new clips</b><small>Nothing is deleted. New clips fail until you free up space.</small></span></label>
+        <label class="st-opt"><input type="radio" name="stWhen" value="delete_oldest"><span><b>Delete the oldest clips automatically</b><small>Makes room for each new clip by removing your oldest files.</small></span></label>
+      </div>
+      <p class="callout warn st-warn" id="stWarn" hidden><b>Careful:</b> Clipper will permanently delete your oldest clips, highlights and downloads whenever it needs room. They don't go to the Bin.</p>
+    </div>
+    <div class="st-foot">
+      <div class="msg" id="stMsg" role="alert"></div>
+      <span class="grow"></span>
+      <button type="button" class="btn primary" id="stSave">Save</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="deleteDlg" aria-labelledby="delTitle">
+  <form method="dialog">
+    <h2 id="delTitle">Delete this file?</h2>
+    <p id="delText"></p>
+    <div class="dlg-acts">
+      <button type="submit" class="btn" value="cancel" autofocus>Cancel</button>
+      <button type="submit" class="btn danger-solid" value="delete">Delete</button>
+    </div>
+  </form>
 </dialog>
 
 <dialog id="quitDlg" aria-labelledby="quitTitle">
@@ -387,6 +506,62 @@
   </article>
 </template>
 
+<template id="dlTpl">
+  <div class="dl">
+    <div class="dl-loading" role="status" hidden><span class="spinner" aria-hidden="true"></span><span>Looking up the link… this can take a few seconds.</span></div>
+    <div class="callout warn dl-error" role="alert" hidden>
+      <p class="dl-error-text"></p>
+      <p class="dl-hint" hidden></p>
+      <div class="callout-acts"><button type="button" class="btn sm dl-retry">Try again</button></div>
+    </div>
+    <div class="dl-body" hidden>
+      <div class="source dl-preview">
+        <div class="source-thumb dl-thumb" aria-hidden="true"></div>
+        <div class="source-info">
+          <div class="source-title dl-title"></div>
+          <div class="source-meta dl-meta"></div>
+        </div>
+      </div>
+      <p class="callout dl-live" hidden>This is live right now. To save moments as they happen, use Make a clip → Live stream. A download may only work after the stream ends.</p>
+      <div class="dl-entries" hidden>
+        <div class="dl-entries-head">
+          <span class="q-label">This link has <span class="dl-count"></span> videos</span>
+          <span class="grow"></span>
+          <button type="button" class="btn sm quiet dl-all">Select all</button>
+          <button type="button" class="btn sm quiet dl-none">Select none</button>
+        </div>
+        <div class="dl-list"></div>
+      </div>
+      <div class="dl-quality">
+        <div class="q-label">Quality</div>
+        <div class="dl-choices" role="radiogroup" aria-label="Quality"></div>
+      </div>
+    </div>
+    <details class="more dl-more">
+      <summary>More options</summary>
+      <div class="more-body">
+        <label class="field"><span class="label">Use my login from</span>
+          <select class="input dl-browser">
+            <option value="">None</option><option value="chrome">Chrome</option><option value="safari">Safari</option>
+            <option value="firefox">Firefox</option><option value="edge">Edge</option><option value="brave">Brave</option>
+          </select>
+        </label>
+        <p class="hint">Instagram and some X posts only work if you're logged in to that site in this browser on this computer.</p>
+        <p class="hint">Safari: first give Terminal (or the Clipper app) Full Disk Access in System Settings → Privacy &amp; Security.</p>
+      </div>
+    </details>
+    <div class="dl-actions" hidden>
+      <div class="actionbar">
+        <span class="summary dl-summary"></span>
+        <span class="grow"></span>
+        <button type="button" class="btn primary xl dl-go">↓ Download</button>
+      </div>
+      <p class="rights">Only download videos you own or have permission to save.</p>
+      <div class="result dl-result" role="status" hidden></div>
+    </div>
+  </div>
+</template>
+
 <template id="clipTpl">
   <article class="clip">
     <button type="button" class="thumb" disabled>
@@ -399,11 +574,12 @@
     <div class="clip-body">
       <div class="clip-title"></div>
       <div class="clip-src"></div>
-      <div class="clip-meta"><span class="pill clip-pill"></span><span class="clip-when mono"></span></div>
+      <div class="clip-meta"><span class="pill clip-pill"></span><span class="clip-when mono"></span><span class="clip-folder mono"></span></div>
       <div class="err clip-err" hidden></div>
       <div class="clip-acts" hidden>
         <a class="btn sm dl" download>↓ Download</a>
         <button type="button" class="btn sm" data-act="vertical">Make 9:16</button>
+        <button type="button" class="btn sm quiet danger" data-act="delete">Delete</button>
       </div>
     </div>
   </article>

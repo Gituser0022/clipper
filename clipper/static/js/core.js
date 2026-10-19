@@ -156,7 +156,7 @@ export async function refresh() {
     if (text !== lastText) {
       lastText = text;
       const s = JSON.parse(text);
-      store.recs = s.live; store.jobs = s.jobs;
+      store.recs = s.live; store.jobs = s.jobs; store.storage = s.storage || null;
       store.recording = s.live.filter((r) => r.status === "recording").length;
       store.running = s.jobs.filter((j) => j.status === "running").length;
       changed = true;
@@ -191,10 +191,11 @@ function renderTracker(box) {
   const n = ids.length, done = js.filter((j) => j.status === "done").length, failed = js.filter((j) => j.status === "error").length;
   const working = n - done - failed;
   box.hidden = false;
-  box.className = `result ${working ? "working" : failed && !done ? "failed" : "ready"}`;
+  const state = working ? "working" : failed && !done ? "failed" : "ready";
+  box.classList.add("result"); box.classList.remove("working", "failed", "ready"); box.classList.add(state);  // keep the box's own classes
   const text = working ? `Making ${plural(n, "clip")}… ${done} of ${n} ready`
     : failed ? `${done} of ${n} ready · ${failed} couldn't be made` : `${n === 1 ? "Your clip is" : `All ${n} clips are`} ready`;
-  const key = `${box.className}|${text}`;
+  const key = `${state}|${text}`;
   if (box.dataset.key === key) return;
   box.dataset.key = key;
   box.replaceChildren(el("span", working ? "spinner" : "result-icon", working ? null : failed && !done ? "!" : "✓"),
@@ -203,7 +204,7 @@ function renderTracker(box) {
   box.appendChild(a);
 }
 onState(() => { for (const box of trackers.keys()) renderTracker(box); });
-export function untrack(box) { trackers.delete(box); box.hidden = true; box.dataset.key = ""; }
+export function untrack(box) { trackers.delete(box); box.hidden = true; box.dataset.key = ""; box.classList.remove("working", "failed", "ready"); }
 
 // -- readable names for links ----------------------------------------------------------
 // Titles we learned while inspecting links, so clip cards can say "My video" rather

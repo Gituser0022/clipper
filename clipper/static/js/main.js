@@ -5,9 +5,11 @@ import { resetPlayer } from "./player.js";
 import { clipNewest } from "./recording.js";
 import "./highlights.js";
 import "./clips.js";
+import "./download.js";
+import "./storage.js";
 
 // -- pages (#/make, #/recording, #/clips) ------------------------------------------------
-const VIEWS = ["make", "recording", "clips"];
+const VIEWS = ["make", "download", "recording", "clips"];
 function route() {
   const v = VIEWS.find((x) => location.hash === `#/${x}`) || "make";
   for (const x of VIEWS) {
@@ -16,7 +18,7 @@ function route() {
   }
   if (v === "clips") seenClips = store.jobs.length;
   badges();
-  document.title = { make: "Clipper", recording: "Recording · Clipper", clips: "My clips · Clipper" }[v];
+  document.title = { make: "Clipper", download: "Download · Clipper", recording: "Recording · Clipper", clips: "My clips · Clipper" }[v];
 }
 addEventListener("hashchange", () => { route(); window.scrollTo(0, 0); });
 
@@ -36,7 +38,7 @@ let primed = false;  // clips that already exist when the page opens aren't "new
 onState((s) => { if (!primed) { primed = true; seenClips = s.jobs.length; } badges(); });
 
 // -- keyboard -------------------------------------------------------------------------
-const dialogOpen = () => $("quitDlg").open || $("viewer").open;
+const dialogOpen = () => ["quitDlg", "viewer", "settingsDlg", "deleteDlg"].some((id) => $(id).open);
 const typing = (e) => {
   const t = e.target;
   return e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || dialogOpen();
