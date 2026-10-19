@@ -100,7 +100,9 @@ def test_server_api(tmp_path, monkeypatch):
                                                                segment_seconds=1, producer_cmd=FAKE_LIVE))
     client = TestClient(server.app)
     assert "Clipper" in client.get("/").text
-    assert client.post("/api/vod/clip", json={"url": "u", "start": "10", "end": "5"}).status_code == 400
+    assert client.post("/api/vod/clip", json={"url": "https://youtu.be/x", "start": "10", "end": "5"}).status_code == 400
+    assert client.post("/api/live/start", json={"url": "  "}).status_code == 422
+    assert client.post("/api/vod/clip", json={"url": "not a link", "start": "0", "end": "5"}).status_code == 422
 
     rec = client.post("/api/live/start", json={"url": "fake://live", "buffer_seconds": 60}).json()
     try:

@@ -10,7 +10,9 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, StringConstraints
 
 from .live import LiveRecorder
 from .vod import clip_vod
@@ -21,6 +23,9 @@ WORK_DIR = DATA_DIR / "work"
 STATIC_DIR = Path(__file__).parent / "static"
 
 recorders: dict[str, LiveRecorder] = {}
+
+# Rejects blank or non-link input before it reaches yt-dlp.
+Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\w[\w+.-]*://\S+$")]
 
 
 @asynccontextmanager
@@ -53,14 +58,14 @@ def _run_job(kind, label, fn):
 
 
 class VodClipRequest(BaseModel):
-    url: str
+    url: Url
     start: str
     end: str
     precise: bool = False
 
 
 class LiveStartRequest(BaseModel):
-    url: str
+    url: Url
     buffer_seconds: int = Field(300, ge=10, le=3 * 3600)
 
 

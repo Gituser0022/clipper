@@ -77,7 +77,8 @@ async function api(path, opts = {}) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = body.detail;
-    const msg = Array.isArray(d) ? d.map(e => `${e.loc?.at(-1) ?? ""}: ${e.msg}`).join("\n") : d;
+    const say = (e) => e.loc?.at(-1) === "url" ? "Paste a link starting with https://" : `${e.loc?.at(-1) ?? ""}: ${e.msg}`;
+    const msg = Array.isArray(d) ? d.map(say).join("\n") : d;
     throw new Error(msg || res.statusText);
   }
   return body;
