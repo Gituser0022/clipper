@@ -1,0 +1,22 @@
+[project]
+name = "clipper"
+version = "0.1.0"
+description = "Clip YouTube videos, VODs and live streams in real time"
+requires-python = ">=3.10"
+dependencies = ["yt-dlp", "fastapi", "uvicorn"]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[project.scripts]
+clipper = "clipper.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["clipper"]
+
+[tool.setuptools.package-data]
+clipper = ["static/*"]

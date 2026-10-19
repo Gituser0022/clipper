@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clipper</title>
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b92a3; --accent:#ff4d5e; --ok:#3ecf8e; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:1000px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 20px; } h1 span { color:var(--accent); }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  input { width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--line); background:#0c0e12; color:var(--text); font:inherit; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  button { padding:9px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; margin-top:12px; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
+  button:disabled { opacity:.5; cursor:default; }
+  .muted { color:var(--muted); font-size:13px; }
+  .rec { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:12px; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:6px; }
+  .dot.recording { background:var(--accent); animation:pulse 1.2s infinite; } .dot.error { background:#f5a524; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; } .btns button { margin-top:8px; }
+  .clips { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); margin-top:16px; }
+  .clip { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; overflow:hidden; }
+  .clip video { width:100%; border-radius:6px; background:#000; }
+  .clip .label { font-size:13px; word-break:break-all; margin:6px 0; }
+  .err { color:#f5a524; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+  a { color:var(--accent); }
+  kbd { border:1px solid var(--line); border-radius:4px; padding:0 5px; font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>✂ <span>Clipper</span></h1>
+  <div class="grid">
+    <section>
+      <h2>Clip a video</h2>
+      <div class="muted">YouTube videos, past streams, Twitch VODs…</div>
+      <label>Video URL</label>
+      <input id="vodUrl" placeholder="https://www.youtube.com/watch?v=…">
+      <div class="row">
+        <div><label>Start</label><input id="vodStart" placeholder="1:23"></div>
+        <div><label>End</label><input id="vodEnd" placeholder="1:53"></div>
+      </div>
+      <label style="display:flex;gap:6px;align-items:center;color:var(--text)">
+        <input type="checkbox" id="vodPrecise" style="width:auto"> Frame-accurate cut (slower)
+      </label>
+      <button id="vodGo">Create clip</button>
+    </section>
+
+    <section>
+      <h2>Clip a live stream</h2>
+      <div class="muted">Recording runs in the background — clip the last moments anytime.</div>
+      <label>Live stream URL</label>
+      <input id="liveUrl" placeholder="https://www.youtube.com/@channel/live or twitch.tv/…">
+      <label>Rewind buffer (minutes)</label>
+      <input id="liveBuf" type="number" value="5" min="1" max="180">
+      <button id="liveGo">Start watching</button>
+      <div id="recorders"></div>
+      <div class="muted" style="margin-top:10px">Shortcut: <kbd>C</kbd> clips the last 30s of the newest stream.</div>
+    </section>
+  </div>
+
+  <h2 style="margin-top:28px">Clips</h2>
+  <div id="clips" class="clips"><div class="muted">No clips yet.</div></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail ? JSON.stringify(body.detail) : res.statusText);
+  return body;
+}
+const post = (path, data) => api(path, { method: "POST", body: JSON.stringify(data || {}) });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+$("vodGo").onclick = async () => {
+  try {
+    await post("/api/vod/clip", { url: $("vodUrl").value.trim(), start: $("vodStart").value.trim(),
+                                   end: $("vodEnd").value.trim(), precise: $("vodPrecise").checked });
+    refresh();
+  } catch (e) { alert(e.message); }
+};
+
+$("liveGo").onclick = async () => {
+  try {
+    await post("/api/live/start", { url: $("liveUrl").value.trim(), buffer_seconds: Math.round($("liveBuf").value * 60) });
+    refresh();
+  } catch (e) { alert(e.message); }
+};
+
+let recs = [];
+function renderRecorders() {
+  $("recorders").innerHTML = recs.map(r => `
+    <div class="rec">
+      <div><span class="dot ${esc(r.status)}"></span><b>${esc(r.status)}</b>
+        <span class="muted"> · ${Math.round(r.buffered)}s buffered of ${r.buffer_seconds}s</span></div>
+      <div class="muted" style="word-break:break-all">${esc(r.url)}</div>
+      ${r.error ? `<div class="err">${esc(r.error)}</div>` : ""}
+      <div class="btns">
+        ${[15, 30, 60, 120].map(s => `<button data-clip="${r.id}" data-s="${s}" ${r.buffered ? "" : "disabled"}>Last ${s}s</button>`).join("")}
+        <button class="ghost" data-clip="${r.id}" data-s="30" data-a="15" ${r.buffered ? "" : "disabled"}>30s + next 15s</button>
+        ${r.status === "recording" ? `<button class="ghost" data-stop="${r.id}">Stop</button>`
+                                   : `<button class="ghost" data-del="${r.id}">Remove</button>`}
+      </div>
+    </div>`).join("");
+}
+$("recorders").onclick = async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  try {
+    if (b.dataset.clip) await post(`/api/live/${b.dataset.clip}/clip`, { seconds_before: +b.dataset.s, seconds_after: +(b.dataset.a || 0) });
+    if (b.dataset.stop) await post(`/api/live/${b.dataset.stop}/stop`);
+    if (b.dataset.del) await api(`/api/live/${b.dataset.del}`, { method: "DELETE" });
+    refresh();
+  } catch (err) { alert(err.message); }
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() !== "c" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey) return;
+  const r = [...recs].reverse().find(r => r.status === "recording" && r.buffered);
+  if (r) post(`/api/live/${r.id}/clip`, { seconds_before: 30 }).then(refresh);
+});
+
+let lastJobs = "";
+function renderJobs(jobs) {
+  const key = JSON.stringify(jobs.map(j => [j.id, j.status]));
+  if (key === lastJobs) return; lastJobs = key;
+  $("clips").innerHTML = jobs.length ? jobs.map(j => `
+    <div class="clip">
+      ${j.status === "done" ? `<video src="/clips/${encodeURIComponent(j.file)}" controls preload="metadata"></video>` : ""}
+      <div class="label">${esc(j.label)}</div>
+      ${j.status === "running" ? `<div class="muted">⏳ Working…</div>` : ""}
+      ${j.status === "error" ? `<div class="err">${esc(j.error)}</div>` : ""}
+      ${j.status === "done" ? `<a href="/clips/${encodeURIComponent(j.file)}" download>Download ${esc(j.file)}</a>` : ""}
+    </div>`).join("") : `<div class="muted">No clips yet.</div>`;
+}
+
+async function refresh() {
+  try {
+    const [r, j] = await Promise.all([api("/api/live"), api("/api/jobs")]);
+    recs = r; renderRecorders(); renderJobs(j);
+  } catch (e) { /* server restarting */ }
+}
+refresh(); setInterval(refresh, 1500);
+</script>
+</body>
+</html>
