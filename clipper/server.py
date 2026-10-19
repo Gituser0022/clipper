@@ -267,6 +267,12 @@ def job_list():
     return sorted(jobs.values(), key=lambda j: j["created"], reverse=True)
 
 
+@app.get("/api/state")
+def state():
+    """Everything the page polls for, in one request: recorders and jobs."""
+    return {"live": live_list(), "jobs": job_list()}
+
+
 @app.get("/clips/{name}")
 def get_clip(name: str):
     return FileResponse(_clip_path(name))

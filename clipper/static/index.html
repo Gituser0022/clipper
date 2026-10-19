@@ -3,159 +3,791 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>Clipper</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%E2%9C%82%3C/text%3E%3C/svg%3E">
 <style>
-  :root { --bg:#0f1115; --panel:#181b22; --line:#2a2f3a; --text:#e7e9ee; --muted:#8b92a3; --accent:#ff4d5e; --ok:#3ecf8e; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--text); }
-  main { max-width:1000px; margin:0 auto; padding:24px 16px 64px; }
-  h1 { font-size:22px; margin:0 0 20px; } h1 span { color:var(--accent); }
-  h2 { font-size:16px; margin:0 0 12px; }
-  .grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
-  section { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
-  input { width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--line); background:#0c0e12; color:var(--text); font:inherit; }
-  .row { display:flex; gap:8px; } .row > * { flex:1; }
-  button { padding:9px 14px; border:0; border-radius:6px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; margin-top:12px; }
-  button.ghost { background:transparent; border:1px solid var(--line); color:var(--text); }
-  button:disabled { opacity:.5; cursor:default; }
-  .muted { color:var(--muted); font-size:13px; }
-  .rec { border:1px solid var(--line); border-radius:8px; padding:12px; margin-top:12px; }
-  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--muted); margin-right:6px; }
-  .dot.recording { background:var(--accent); animation:pulse 1.2s infinite; } .dot.error { background:#f5a524; }
-  @keyframes pulse { 50% { opacity:.3; } }
-  .btns { display:flex; flex-wrap:wrap; gap:6px; } .btns button { margin-top:8px; }
-  .clips { display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); margin-top:16px; }
-  .clip { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px; overflow:hidden; }
-  .clip video { width:100%; border-radius:6px; background:#000; }
-  .clip .label { font-size:13px; word-break:break-all; margin:6px 0; }
-  .err { color:#f5a524; font-size:12px; white-space:pre-wrap; word-break:break-word; }
+  :root {
+    --bg:#0f1115; --panel:#181b22; --panel-2:#1e222b; --line:#2a2f3a; --line-2:#3a4150;
+    --text:#e7e9ee; --muted:#9aa1b1; --accent:#ff4d5e; --accent-strong:#d92b3a; --accent-soft:rgba(255,77,94,.14);
+    --ok:#3ecf8e; --warn:#f5a524; --field:#0c0e12; --radius:12px;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; font:15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:1080px; margin:0 auto; padding:0 16px 72px; }
+  [hidden] { display:none !important; }
   a { color:var(--accent); }
-  kbd { border:1px solid var(--line); border-radius:4px; padding:0 5px; font-size:12px; }
+  h1, h2, h3 { margin:0; line-height:1.25; }
+  h2 { font-size:17px; }
+  .muted { color:var(--muted); }
+  .small { font-size:13px; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  kbd { display:inline-block; min-width:1.6em; text-align:center; border:1px solid var(--line-2); border-bottom-width:2px; border-radius:5px; padding:0 5px; font:600 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--text); background:var(--panel-2); }
+
+  /* header */
+  .top { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:12px; padding:14px 0; margin-bottom:8px; background:rgba(15,17,21,.92); border-bottom:1px solid var(--line); }
+  @supports (backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px)) {
+    .top { background:rgba(15,17,21,.75); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); }
+  }
+  .brand { font-size:20px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; }
+  .brand span { color:var(--accent); }
+  .summary { flex:1; min-width:0; font-size:13px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .summary .live { color:var(--text); }
+  .summary .offline { color:var(--warn); }
+
+  /* layout */
+  .stack { display:grid; gap:20px; margin-top:16px; }
+  .grid { display:grid; gap:20px; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); align-items:start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; min-width:0; }
+  .panel-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+  .lede { margin:4px 0 0; font-size:13px; color:var(--muted); }
+
+  /* form controls */
+  .field { margin-top:14px; min-width:0; }
+  .field > label, .label { display:block; font-size:12px; font-weight:600; letter-spacing:.02em; color:var(--muted); margin-bottom:6px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+  input[type=text], input[type=url], input[type=number] {
+    width:100%; min-height:40px; padding:8px 11px; border-radius:8px; border:1px solid var(--line); background:var(--field);
+    color:var(--text); font:inherit; transition:border-color .15s, box-shadow .15s, background-color .4s;
+  }
+  input::placeholder { color:#5d6474; }
+  input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  input.flash { background-color:#2a1a1e; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; }
+  .row > * { flex:1 1 120px; min-width:0; }
+  .check { display:flex; gap:9px; align-items:flex-start; font-size:14px; margin-top:10px; cursor:pointer; }
+  .check input { width:16px; height:16px; margin:2px 0 0; accent-color:var(--accent); flex:none; }
+  .check .muted { font-size:13px; }
+  fieldset { border:1px solid var(--line); border-radius:10px; margin:16px 0 0; padding:6px 14px 14px; min-width:0; }
+  legend { font-size:12px; font-weight:600; letter-spacing:.02em; color:var(--muted); padding:0 6px; }
+  details.more { margin-top:12px; }
+  details.more > summary { cursor:pointer; font-size:13px; color:var(--muted); list-style:none; display:inline-flex; align-items:center; gap:6px; border-radius:6px; }
+  details.more > summary::-webkit-details-marker { display:none; }
+  details.more > summary::before { content:""; width:6px; height:6px; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(-45deg); transition:transform .15s; }
+  details.more[open] > summary::before { transform:rotate(45deg); }
+  details.more > summary:hover { color:var(--text); }
+  .form-msg { margin-top:10px; font-size:13px; color:var(--warn); white-space:pre-line; }
+  .form-msg:empty { display:none; }
+  .actions { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; }
+
+  /* buttons */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:40px; padding:8px 16px; border:1px solid transparent; border-radius:8px;
+         background:var(--accent-strong); color:#fff; font:inherit; font-weight:600; line-height:1.2; text-decoration:none; cursor:pointer; white-space:nowrap;
+         transition:background-color .15s, border-color .15s, color .15s, transform .05s; touch-action:manipulation; }
+  .btn:hover { background:#e83a49; }
+  .btn:active { transform:translateY(1px); }
+  .btn.ghost { background:transparent; border-color:var(--line-2); color:var(--text); }
+  .btn.ghost:hover { background:var(--panel-2); border-color:#4a5263; }
+  .btn.sm { min-height:32px; padding:5px 11px; font-size:13px; border-radius:7px; }
+  .btn.danger:hover { color:#ff8a95; border-color:#6b2d36; }
+  .btn[aria-pressed=true] { border-color:rgba(62,207,142,.55); color:var(--ok); }
+  .btn:disabled, .btn[aria-disabled=true] { opacity:.45; cursor:not-allowed; transform:none; }
+  .btn:disabled:hover { background:var(--accent-strong); }
+  .btn.ghost:disabled:hover { background:transparent; border-color:var(--line-2); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  input:focus-visible { outline:none; }
+
+  /* players */
+  .player { position:relative; aspect-ratio:16/9; background:#000; border-radius:10px; overflow:hidden; }
+  .player > iframe, .player > video, .player > div { position:absolute; inset:0; width:100%; height:100%; border:0; display:block; }
+  .marks { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .marks kbd { margin-left:2px; }
+
+  /* recorders */
+  .recs { display:grid; gap:14px; margin-top:12px; }
+  .rec { background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:14px; min-width:0; }
+  .rec.is-recording { border-color:#4a2a31; }
+  .rec-head { display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; }
+  .rec-status { font-weight:700; white-space:nowrap; }
+  .rec-url { flex:1 1 160px; min-width:0; color:var(--muted); font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:none; }
+  .rec-url[href]:hover { color:var(--text); text-decoration:underline; }
+  .rec-buf { font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .meter { height:4px; margin-top:10px; border-radius:2px; background:#2a2f3a; overflow:hidden; }
+  .meter > div { height:100%; background:var(--accent); transform-origin:left; transform:scaleX(0); transition:transform .4s linear; }
+  .rec:not(.is-recording) .meter > div { background:var(--line-2); }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--muted); flex:none; }
+  .dot.recording { background:var(--accent); box-shadow:0 0 0 0 rgba(255,77,94,.6); animation:pulse 1.6s infinite; }
+  .dot.error { background:var(--warn); }
+  .dot.ended, .dot.stopped { background:#5d6474; }
+  @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(255,77,94,.55); } 70% { box-shadow:0 0 0 7px rgba(255,77,94,0); } 100% { box-shadow:0 0 0 0 rgba(255,77,94,0); } }
+  .err { color:var(--warn); font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .rec-err { margin-top:10px; }
+  .rec .watch:not(:empty) { margin-top:12px; }
+  /* Keep the clip buttons on screen while watching. */
+  .rec .watch .player { width:min(100%, calc(55vh * 16 / 9)); margin:0 auto; }
+  .clipbar { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:14px; }
+  .clipbar .btn { min-height:44px; padding:8px 14px; font-variant-numeric:tabular-nums; }
+  .clipbar .check { margin:0 0 0 4px; font-size:13px; align-items:center; }
+  .clipbar .check input { margin:0; }
+  .rec-foot { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+  .rec-foot .spacer { flex:1; }
+  .auto { margin-top:12px; padding:10px 12px; border-radius:8px; background:rgba(62,207,142,.06); border:1px solid rgba(62,207,142,.18); font-size:13px; }
+  .auto-mode { font-weight:600; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip { display:inline-flex; gap:4px; align-items:center; padding:2px 8px; border-radius:999px; background:#232833; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chip b { color:var(--text); font-weight:600; }
+  .chip.bad { color:var(--warn); }
+  .chip.soon { color:var(--ok); }
+  .events { list-style:none; margin:8px 0 0; padding:0; color:var(--muted); font-size:12px; }
+  .events li { padding:2px 0; overflow-wrap:anywhere; }
+  .events time { font-variant-numeric:tabular-nums; color:var(--text); margin-right:6px; }
+
+  /* clips */
+  .clips-head { display:flex; align-items:baseline; gap:10px; margin-top:12px; }
+  .clips { display:grid; gap:14px; margin-top:12px; grid-template-columns:repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+  .clip { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; min-width:0; display:flex; flex-direction:column; }
+  .thumb { position:relative; aspect-ratio:16/9; background:#000; display:grid; place-items:center; color:var(--muted); font-size:13px; }
+  .thumb video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+  .clip.error .thumb { background:#1a1416; color:var(--warn); }
+  .clip-body { padding:10px 12px 12px; display:grid; gap:6px; min-width:0; }
+  .clip-meta { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); }
+  .badge { padding:1px 7px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; background:#262b35; color:var(--text); }
+  .badge.live, .badge.auto { background:var(--accent-soft); color:#ff8a95; }
+  .clip-title { font-weight:600; font-size:14px; overflow-wrap:anywhere; }
+  .clip-src { font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .clip-acts { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:4px; }
+  .spinner { width:22px; height:22px; border-radius:50%; border:2px solid #3a4150; border-top-color:var(--accent); animation:spin .8s linear infinite; }
+  .working { display:grid; justify-items:center; gap:8px; font-variant-numeric:tabular-nums; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .empty { margin:12px 0 0; padding:28px 16px; text-align:center; color:var(--muted); border:1px dashed var(--line-2); border-radius:var(--radius); font-size:14px; }
+
+  /* toasts + dialog */
+  .toasts { position:fixed; z-index:20; left:50%; bottom:16px; transform:translateX(-50%); display:grid; gap:8px; width:min(420px, calc(100% - 32px)); pointer-events:none; }
+  .toast { pointer-events:auto; padding:10px 14px; border-radius:10px; background:#232833; border:1px solid var(--line-2); box-shadow:0 8px 24px rgba(0,0,0,.4); font-size:14px; white-space:pre-line; overflow-wrap:anywhere; animation:rise .18s ease-out; }
+  .toast.error { border-color:#6b4a1d; color:#ffd08a; }
+  .toast.ok { border-color:rgba(62,207,142,.4); }
+  @keyframes rise { from { opacity:0; transform:translateY(6px); } }
+  dialog { background:var(--panel); color:var(--text); border:1px solid var(--line-2); border-radius:var(--radius); padding:20px; width:min(400px, calc(100% - 32px)); }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog p { margin:8px 0 0; color:var(--muted); font-size:14px; }
+  footer { margin-top:28px; font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px 18px; }
+
+  @media (max-width:520px) {
+    .panel { padding:14px; }
+    .summary { display:none; }
+    .top { justify-content:space-between; }
+    .clipbar .btn { flex:1 1 calc(50% - 8px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>✂ <span>Clipper</span></h1>
-  <div class="grid">
-    <section>
-      <h2>Clip a video</h2>
-      <div class="muted">YouTube videos, past streams, Twitch VODs…</div>
-      <label>Video URL</label>
-      <input id="vodUrl" placeholder="https://www.youtube.com/watch?v=…">
-      <div class="row">
-        <div><label>Start</label><input id="vodStart" placeholder="1:23"></div>
-        <div><label>End</label><input id="vodEnd" placeholder="1:53"></div>
+<main id="app">
+  <header class="top">
+    <h1 class="brand">✂ <span>Clipper</span></h1>
+    <div class="summary" id="summary" aria-live="polite"></div>
+    <button type="button" class="btn ghost sm" id="quit" title="Stop Clipper and all recordings">Quit Clipper</button>
+  </header>
+
+  <div class="stack">
+    <section class="panel" id="liveSection" aria-labelledby="liveTitle" hidden>
+      <div class="panel-head">
+        <h2 id="liveTitle">Live recordings</h2>
+        <span class="small muted">Press <kbd>C</kbd> to clip the last 30s of the newest stream</span>
       </div>
-      <label style="display:flex;gap:6px;align-items:center;color:var(--text)">
-        <input type="checkbox" id="vodPrecise" style="width:auto"> Frame-accurate cut (slower)
-      </label>
-      <button id="vodGo">Create clip</button>
+      <div class="recs" id="recorders"></div>
     </section>
 
-    <section>
-      <h2>Clip a live stream</h2>
-      <div class="muted">Recording runs in the background — clip the last moments anytime.</div>
-      <label>Live stream URL</label>
-      <input id="liveUrl" placeholder="https://www.youtube.com/@channel/live or twitch.tv/…">
-      <label>Rewind buffer (minutes)</label>
-      <input id="liveBuf" type="number" value="5" min="1" max="180">
-      <button id="liveGo">Start watching</button>
-      <div id="recorders"></div>
-      <div class="muted" style="margin-top:10px">Shortcut: <kbd>C</kbd> clips the last 30s of the newest stream.</div>
+    <div class="grid">
+      <section class="panel" aria-labelledby="vodTitle">
+        <h2 id="vodTitle">Clip a video</h2>
+        <p class="lede">YouTube videos, past streams, Twitch VODs…</p>
+        <form id="vodForm" novalidate>
+          <div class="field">
+            <label for="vodUrl">Video link</label>
+            <input id="vodUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…">
+          </div>
+          <div id="vodPlayerBox" class="field" hidden>
+            <div class="player" id="vodPlayer"></div>
+            <div class="marks">
+              <button type="button" class="btn ghost sm" id="markIn" title="Shortcut: I">Start = now <kbd aria-hidden="true">I</kbd></button>
+              <button type="button" class="btn ghost sm" id="markOut" title="Shortcut: O">End = now <kbd aria-hidden="true">O</kbd></button>
+              <button type="button" class="btn ghost sm" id="playSel">▶ Play selection</button>
+            </div>
+          </div>
+          <div class="hint" id="vodPlayerMsg" aria-live="polite"></div>
+          <div class="row">
+            <div class="field"><label for="vodStart">Start</label><input id="vodStart" type="text" inputmode="decimal" autocomplete="off" placeholder="1:23"></div>
+            <div class="field"><label for="vodEnd">End</label><input id="vodEnd" type="text" inputmode="decimal" autocomplete="off" placeholder="1:53"></div>
+          </div>
+          <div class="hint" id="vodLen">Seconds, m:ss or h:mm:ss — e.g. 90, 1:30, 1:02:03.5</div>
+          <label class="check"><input type="checkbox" id="vodPrecise"> <span>Frame-accurate cut <span class="muted">(slower)</span></span></label>
+          <label class="check"><input type="checkbox" id="vodVertical"> <span>Vertical 9:16 <span class="muted">(Shorts, TikTok, Reels)</span></span></label>
+          <div class="form-msg" id="vodMsg" role="alert"></div>
+          <div class="actions"><button type="submit" class="btn" id="vodGo">Create clip</button></div>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="liveFormTitle">
+        <h2 id="liveFormTitle">Clip a live stream</h2>
+        <p class="lede">Recording runs in the background — clip the last moments any time.</p>
+        <form id="liveForm" novalidate>
+          <div class="field">
+            <label for="liveUrl">Live stream link</label>
+            <input id="liveUrl" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/@channel/live or twitch.tv/…">
+          </div>
+          <div class="field">
+            <label for="liveBuf">Rewind buffer (minutes)</label>
+            <input id="liveBuf" type="number" inputmode="numeric" value="5" min="1" max="180" aria-describedby="liveBufHint">
+            <div class="hint" id="liveBufHint">How far back you can clip. 1–180 minutes.</div>
+          </div>
+          <label class="check"><input type="checkbox" id="liveVertical"> <span>Vertical 9:16 clips</span></label>
+          <fieldset>
+            <legend>Auto-clip</legend>
+            <label class="check"><input type="checkbox" id="autoLoud" checked> <span>When it gets loud</span></label>
+            <label class="check"><input type="checkbox" id="autoChat" checked> <span>When chat gets busy <span class="muted">(YouTube, Twitch)</span></span></label>
+            <details class="more">
+              <summary id="autoSummary">Clip 60s before · 60s after</summary>
+              <div class="row">
+                <div class="field"><label for="autoBefore">Seconds before</label><input id="autoBefore" type="number" inputmode="numeric" value="60" min="5" max="600"></div>
+                <div class="field"><label for="autoAfter">Seconds after</label><input id="autoAfter" type="number" inputmode="numeric" value="60" min="5" max="600"></div>
+              </div>
+              <div class="hint">5–600 seconds around each loud moment or chat spike.</div>
+            </details>
+          </fieldset>
+          <div class="form-msg" id="liveMsg" role="alert"></div>
+          <div class="actions"><button type="submit" class="btn" id="liveGo">Start watching</button></div>
+        </form>
+      </section>
+    </div>
+
+    <section aria-labelledby="clipsTitle">
+      <div class="clips-head">
+        <h2 id="clipsTitle">Clips</h2>
+        <span class="small muted" id="clipCount"></span>
+      </div>
+      <div class="clips" id="clips"></div>
+      <p class="empty" id="clipsEmpty">No clips yet. Clip a video or a live stream and it shows up here.</p>
     </section>
   </div>
 
-  <h2 style="margin-top:28px">Clips</h2>
-  <div id="clips" class="clips"><div class="muted">No clips yet.</div></div>
+  <footer>
+    <span><kbd>I</kbd> / <kbd>O</kbd> set start / end from the player</span>
+    <span><kbd>C</kbd> clip the last 30s of the newest live stream</span>
+  </footer>
 </main>
 
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<dialog id="quitDlg" aria-labelledby="quitTitle">
+  <form method="dialog">
+    <h2 id="quitTitle">Quit Clipper?</h2>
+    <p>Any live recordings stop. Saved clips are kept.</p>
+    <div class="actions" style="justify-content:flex-end">
+      <button type="submit" class="btn ghost" value="cancel" autofocus>Cancel</button>
+      <button type="submit" class="btn" value="quit">Quit Clipper</button>
+    </div>
+  </form>
+</dialog>
+
+<template id="recTpl">
+  <article class="rec">
+    <div class="rec-head">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="rec-status"></span>
+      <a class="rec-url" target="_blank" rel="noopener noreferrer"></a>
+      <span class="rec-buf"></span>
+    </div>
+    <div class="meter" aria-hidden="true"><div></div></div>
+    <div class="err rec-err" hidden></div>
+    <div class="watch"></div>
+    <div class="clipbar" role="group" aria-label="Save a clip">
+      <button type="button" class="btn" data-act="clip" data-s="15">Last 15s</button>
+      <button type="button" class="btn" data-act="clip" data-s="30" title="Shortcut: C (newest stream)">Last 30s</button>
+      <button type="button" class="btn" data-act="clip" data-s="60">Last 60s</button>
+      <button type="button" class="btn" data-act="clip" data-s="120">Last 120s</button>
+      <button type="button" class="btn ghost" data-act="clip" data-s="30" data-a="15">30s + next 15s</button>
+      <label class="check" title="Save clips vertical (Shorts, TikTok, Reels)"><input type="checkbox" class="rec-vertical"> 9:16</label>
+    </div>
+    <div class="auto" hidden>
+      <div class="auto-mode"></div>
+      <div class="chips">
+        <span class="chip auto-vol"></span>
+        <span class="chip auto-chat"></span>
+        <span class="chip auto-count"></span>
+        <span class="chip soon auto-pending" hidden>saving one soon…</span>
+      </div>
+      <ul class="events" aria-label="Recent auto-clip triggers"></ul>
+    </div>
+    <div class="rec-foot">
+      <button type="button" class="btn ghost sm" data-act="watch">▶ Watch</button>
+      <button type="button" class="btn ghost sm" data-act="auto" aria-pressed="false">Auto-clip</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost sm" data-act="stop">Stop</button>
+      <button type="button" class="btn ghost sm danger" data-act="del">Remove</button>
+    </div>
+  </article>
+</template>
+
+<template id="clipTpl">
+  <article class="clip">
+    <div class="thumb"></div>
+    <div class="clip-body">
+      <div class="clip-meta"><span class="badge"></span><time></time></div>
+      <div class="clip-title"></div>
+      <div class="clip-src"></div>
+      <div class="err clip-err" hidden></div>
+      <div class="clip-acts" hidden>
+        <a class="btn ghost sm dl" download>Download</a>
+        <button type="button" class="btn ghost sm" data-act="vertical">Make 9:16</button>
+      </div>
+    </div>
+  </article>
+</template>
+
 <script>
+"use strict";
 const $ = (id) => document.getElementById(id);
-async function api(path, opts = {}) {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const d = body.detail;
-    const say = (e) => e.loc?.at(-1) === "url" ? "Paste a link starting with https://" : `${e.loc?.at(-1) ?? ""}: ${e.msg}`;
-    const msg = Array.isArray(d) ? d.map(say).join("\n") : d;
-    throw new Error(msg || res.statusText);
+
+// -- helpers ------------------------------------------------------------------------
+// Write to the DOM only when a value actually changes (keeps polling cheap).
+const setText = (el, v) => { v = String(v ?? ""); if (el.textContent !== v) el.textContent = v; };
+const setHidden = (el, h) => { h = !!h; if (el.hidden !== h) el.hidden = h; };
+const setDisabled = (el, d) => { d = !!d; if (el.disabled !== d) el.disabled = d; };
+const setAttr = (el, k, v) => { if (v == null) { if (el.hasAttribute(k)) el.removeAttribute(k); } else if (el.getAttribute(k) !== String(v)) el.setAttribute(k, v); };
+const setClass = (el, c, on) => { if (el.classList.contains(c) !== !!on) el.classList.toggle(c, !!on); };
+const typing = (e) => { const t = e.target; return e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable ||
+  ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || $("quitDlg").open; };
+const fmt = (s) => { s = Math.max(0, s); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = (s % 60).toFixed(1).padStart(4, "0");
+                     return (h ? `${h}:${String(m).padStart(2, "0")}` : `${m}`) + `:${x}`; };
+const dur = (s) => { s = Math.round(s); const m = Math.floor(s / 60); return m ? `${m}:${String(s % 60).padStart(2, "0")}` : `${s}s`; };
+const clock = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+// Same rules as clipper/timeparse.py: "90", "1:30", "1:02:03.5". Returns null when invalid.
+function parseTime(text) {
+  const parts = String(text).trim().split(":");
+  if (!String(text).trim() || parts.length > 3) return null;
+  let s = 0;
+  for (const p of parts) { const n = Number(p.trim()); if (p.trim() === "" || !Number.isFinite(n)) return null; s = s * 60 + n; }
+  return s >= 0 ? s : null;
+}
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+// -- API ----------------------------------------------------------------------------
+function errorMessage(detail, fallback) {
+  if (Array.isArray(detail)) {
+    const say = (e) => { const f = e.loc?.at(-1);
+      return f === "url" ? "Paste a link starting with https://" : `${String(f ?? "").replace(/_/g, " ")}: ${e.msg}`.replace(/^: /, ""); };
+    return [...new Set(detail.map(say))].join("\n");
   }
+  return (typeof detail === "string" && detail) || fallback;
+}
+async function api(path, opts = {}) {
+  let res;
+  try { res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts }); }
+  catch { throw new Error("Can't reach Clipper. Is it still running?"); }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(errorMessage(body.detail, res.statusText || `Error ${res.status}`));
   return body;
 }
 const post = (path, data) => api(path, { method: "POST", body: JSON.stringify(data || {}) });
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-$("vodGo").onclick = async () => {
-  try {
-    await post("/api/vod/clip", { url: $("vodUrl").value.trim(), start: $("vodStart").value.trim(),
-                                   end: $("vodEnd").value.trim(), precise: $("vodPrecise").checked });
-    refresh();
-  } catch (e) { alert(e.message); }
-};
-
-$("liveGo").onclick = async () => {
-  try {
-    // Empty or out-of-range buffer falls back to 5 minutes / clamps to 1–180.
-    const minutes = Math.min(180, Math.max(1, Number($("liveBuf").value) || 5));
-    $("liveBuf").value = minutes;
-    await post("/api/live/start", { url: $("liveUrl").value.trim(), buffer_seconds: Math.round(minutes * 60) });
-    refresh();
-  } catch (e) { alert(e.message); }
-};
-
-let recs = [];
-function renderRecorders() {
-  $("recorders").innerHTML = recs.map(r => `
-    <div class="rec">
-      <div><span class="dot ${esc(r.status)}"></span><b>${esc(r.status)}</b>
-        <span class="muted"> · ${Math.round(r.buffered)}s buffered of ${r.buffer_seconds}s</span></div>
-      <div class="muted" style="word-break:break-all">${esc(r.url)}</div>
-      ${r.error ? `<div class="err">${esc(r.error)}</div>` : ""}
-      <div class="btns">
-        ${[15, 30, 60, 120].map(s => `<button data-clip="${r.id}" data-s="${s}" ${r.buffered ? "" : "disabled"}>Last ${s}s</button>`).join("")}
-        <button class="ghost" data-clip="${r.id}" data-s="30" data-a="15" ${r.buffered ? "" : "disabled"}>30s + next 15s</button>
-        ${r.status === "recording" ? `<button class="ghost" data-stop="${r.id}">Stop</button>`
-                                   : `<button class="ghost" data-del="${r.id}">Remove</button>`}
-      </div>
-    </div>`).join("");
+function toast(msg, kind = "info", ms = kind === "error" ? 6000 : 2500) {
+  const box = $("toasts"), el = document.createElement("div");
+  el.className = `toast ${kind}`; el.textContent = msg;
+  if (kind === "error") el.setAttribute("role", "alert");
+  box.appendChild(el);
+  while (box.children.length > 3) box.firstElementChild.remove();
+  setTimeout(() => el.remove(), ms);
 }
-$("recorders").onclick = async (e) => {
-  const b = e.target.closest("button"); if (!b) return;
+async function busy(btn, label, fn) {
+  const old = btn.textContent; btn.disabled = true; if (label) btn.textContent = label;
+  try { return await fn(); } finally { btn.disabled = false; if (label) btn.textContent = old; }
+}
+
+// -- video player for marking start / end ------------------------------------------
+let player = null, ytReady = null, previewFor = "";
+function loadYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (!ytReady) ytReady = new Promise((ok, fail) => {
+    window.onYouTubeIframeAPIReady = ok;
+    const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; s.async = true;
+    s.onerror = () => { ytReady = null; s.remove(); fail(new Error("couldn't load the YouTube player")); };
+    document.head.appendChild(s);
+  });
+  return ytReady;
+}
+function resetPreview() {
+  player = null; clearInterval(selTimer);
+  $("vodPlayerBox").hidden = true; $("vodPlayer").replaceChildren();
+}
+async function loadPreview() {
+  const url = $("vodUrl").value.trim();
+  if (url === previewFor) return;
+  previewFor = url; resetPreview();
+  if (!url) { setText($("vodPlayerMsg"), ""); return; }
+  setText($("vodPlayerMsg"), "Loading preview…");
   try {
-    if (b.dataset.clip) await post(`/api/live/${b.dataset.clip}/clip`, { seconds_before: +b.dataset.s, seconds_after: +(b.dataset.a || 0) });
-    if (b.dataset.stop) await post(`/api/live/${b.dataset.stop}/stop`);
-    if (b.dataset.del) await api(`/api/live/${b.dataset.del}`, { method: "DELETE" });
-    refresh();
-  } catch (err) { alert(err.message); }
+    const p = await api(`/api/preview?url=${encodeURIComponent(url)}`);
+    if (p.kind === "youtube") await loadYouTubeApi();
+    if (previewFor !== url) return;
+    if (p.kind === "youtube") {
+      const div = document.createElement("div"); $("vodPlayer").appendChild(div);
+      const yt = new YT.Player(div, { videoId: p.id, playerVars: { playsinline: 1, rel: 0 } });
+      player = { time: () => yt.getCurrentTime?.() ?? 0, seek: (t) => yt.seekTo?.(t, true), play: () => yt.playVideo?.(), pause: () => yt.pauseVideo?.() };
+    } else {
+      const v = document.createElement("video"); v.src = p.url; v.controls = true; v.playsInline = true; v.preload = "metadata";
+      $("vodPlayer").appendChild(v);
+      player = { time: () => v.currentTime, seek: (t) => { v.currentTime = t; }, play: () => v.play().catch(() => {}), pause: () => v.pause() };
+    }
+    $("vodPlayerBox").hidden = false;
+    setText($("vodPlayerMsg"), "Play the video, then press Start = now / End = now (or I / O).");
+  } catch (e) {
+    if (previewFor === url) setText($("vodPlayerMsg"), `No preview: ${e.message}. You can still type the times.`);
+  }
+}
+$("vodUrl").addEventListener("change", loadPreview);
+$("vodUrl").addEventListener("paste", () => setTimeout(loadPreview, 0));
+$("vodUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); loadPreview(); } });
+
+function flash(input) { input.classList.add("flash"); setTimeout(() => input.classList.remove("flash"), 400); }
+function mark(id) { if (!player) return; $(id).value = fmt(player.time()); flash($(id)); updateLength(); }
+const markIn = () => mark("vodStart"), markOut = () => mark("vodEnd");
+$("markIn").onclick = markIn; $("markOut").onclick = markOut;
+let selTimer = null;
+$("playSel").onclick = () => {
+  const a = parseTime($("vodStart").value), b = parseTime($("vodEnd").value);
+  if (!player || a == null || b == null || b <= a) { setText($("vodMsg"), "Set a start and an end first."); return; }
+  setText($("vodMsg"), "");
+  player.seek(a); player.play(); clearInterval(selTimer);
+  selTimer = setInterval(() => { if (!player || player.time() >= b) { player?.pause(); clearInterval(selTimer); } }, 200);
 };
-document.addEventListener("keydown", (e) => {
-  if (e.key.toLowerCase() !== "c" || e.target.tagName === "INPUT" || e.ctrlKey || e.metaKey) return;
-  const r = [...recs].reverse().find(r => r.status === "recording" && r.buffered);
-  if (r) post(`/api/live/${r.id}/clip`, { seconds_before: 30 }).then(refresh);
+function updateLength() {
+  const a = parseTime($("vodStart").value), b = parseTime($("vodEnd").value);
+  setText($("vodLen"), a != null && b != null && b > a ? `Clip length: ${fmt(b - a)}`
+                                                     : "Seconds, m:ss or h:mm:ss — e.g. 90, 1:30, 1:02:03.5");
+}
+$("vodStart").addEventListener("input", updateLength);
+$("vodEnd").addEventListener("input", updateLength);
+
+$("vodForm").onsubmit = (e) => {
+  e.preventDefault();
+  const start = $("vodStart").value.trim(), end = $("vodEnd").value.trim(), msg = $("vodMsg");
+  const a = parseTime(start), b = parseTime(end);
+  const problem = !$("vodUrl").value.trim() ? "Paste a link starting with https://"
+    : a == null ? "Start isn't a time — try 90, 1:30 or 1:02:03."
+    : b == null ? "End isn't a time — try 90, 1:30 or 1:02:03."
+    : b <= a ? "End must be after start." : "";
+  setText(msg, problem);
+  if (problem) return;
+  busy($("vodGo"), "Creating…", async () => {
+    try {
+      await post("/api/vod/clip", { url: $("vodUrl").value.trim(), start, end, precise: $("vodPrecise").checked,
+                                     vertical: $("vodVertical").checked });
+      toast("Clip started — it appears under Clips.", "ok"); kick();
+    } catch (err) { setText(msg, err.message); }
+  });
+};
+
+// -- live streams -------------------------------------------------------------------
+function autoSettings() {
+  const n = (id, d) => { const v = Math.min(600, Math.max(5, Number($(id).value) || d)); $(id).value = v; return v; };
+  return { audio: $("autoLoud").checked, chat: $("autoChat").checked,
+           before: n("autoBefore", 60), after: n("autoAfter", 60), vertical: $("liveVertical").checked };
+}
+function updateAutoSummary() {
+  const n = (id, d) => Math.min(600, Math.max(5, Number($(id).value) || d));
+  setText($("autoSummary"), `Clip ${n("autoBefore", 60)}s before · ${n("autoAfter", 60)}s after`);
+}
+$("autoBefore").addEventListener("input", updateAutoSummary);
+$("autoAfter").addEventListener("input", updateAutoSummary);
+
+$("liveForm").onsubmit = (e) => {
+  e.preventDefault();
+  const msg = $("liveMsg");
+  if (!$("liveUrl").value.trim()) { setText(msg, "Paste a link starting with https://"); return; }
+  setText(msg, "");
+  // Empty or out-of-range buffer falls back to 5 minutes / clamps to 1–180.
+  const minutes = Math.min(180, Math.max(1, Number($("liveBuf").value) || 5));
+  $("liveBuf").value = minutes;
+  busy($("liveGo"), "Starting…", async () => {
+    try {
+      const rec = await post("/api/live/start", { url: $("liveUrl").value.trim(), buffer_seconds: Math.round(minutes * 60), auto: autoSettings() });
+      revealRec = rec.id; kick();
+    } catch (err) { setText(msg, err.message); }
+  });
+};
+
+// One "vertical" setting for manual live clips, mirrored on every recorder card.
+function setLiveVertical(v) {
+  $("liveVertical").checked = v;
+  for (const n of recNodes.values()) n.vertical.checked = v;
+}
+$("liveVertical").addEventListener("change", (e) => setLiveVertical(e.target.checked));
+
+const STATUS = { recording: "Recording", ended: "Stream ended", error: "Error", stopped: "Stopped" };
+let recs = [], revealRec = null;
+const recNodes = new Map();
+
+function makeRec(r) {
+  const el = $("recTpl").content.firstElementChild.cloneNode(true), q = (s) => el.querySelector(s);
+  el.dataset.id = r.id;
+  const n = { el, dot: q(".dot"), status: q(".rec-status"), url: q(".rec-url"), buf: q(".rec-buf"), fill: q(".meter > div"),
+              err: q(".rec-err"), watch: q(".watch"), clips: [...el.querySelectorAll('[data-act="clip"]')], vertical: q(".rec-vertical"),
+              auto: q(".auto"), mode: q(".auto-mode"), vol: q(".auto-vol"), chat: q(".auto-chat"), count: q(".auto-count"),
+              pending: q(".auto-pending"), events: q(".events"), watchBtn: q('[data-act="watch"]'), autoBtn: q('[data-act="auto"]'),
+              stopBtn: q('[data-act="stop"]'), delBtn: q('[data-act="del"]'), evKey: "", fillVal: -1 };
+  n.vertical.checked = $("liveVertical").checked;
+  return n;
+}
+function updateRec(n, r) {
+  const live = r.status === "recording";
+  setClass(n.el, "is-recording", live);
+  setAttr(n.dot, "class", `dot ${r.status}`);
+  setText(n.status, STATUS[r.status] || r.status);
+  setText(n.url, r.url); setAttr(n.url, "title", r.url);
+  setAttr(n.url, "href", /^https?:\/\//i.test(r.url) ? r.url : null);
+  setText(n.buf, `${dur(r.buffered)} of ${dur(r.buffer_seconds)} buffered`);
+  const fill = Math.round(Math.min(1, r.buffer_seconds ? r.buffered / r.buffer_seconds : 0) * 1000) / 1000;
+  if (fill !== n.fillVal) { n.fillVal = fill; n.fill.style.transform = `scaleX(${fill})`; }
+  setText(n.err, r.error); setHidden(n.err, !r.error);
+  for (const b of n.clips) setDisabled(b, !r.buffered);
+  setHidden(n.watchBtn, !r.youtube_id);
+  setText(n.watchBtn, n.watch.firstChild ? "Hide video" : "▶ Watch");
+  setHidden(n.autoBtn, !live);
+  setAttr(n.autoBtn, "aria-pressed", String(!!r.auto));
+  setText(n.autoBtn, r.auto ? "Auto-clip: on" : "Auto-clip: off");
+  setHidden(n.stopBtn, !live); setHidden(n.delBtn, live);
+
+  const a = r.auto;
+  setHidden(n.auto, !a);
+  if (!a) return;
+  const what = [a.audio && "loud moments", a.chat && "busy chat"].filter(Boolean).join(" + ");
+  setText(n.mode, `Auto-clipping ${what} · ${a.before}s before, ${a.after}s after${a.vertical ? " · 9:16" : ""}`);
+  setHidden(n.vol, !a.audio);
+  setText(n.vol, a.level_db == null ? "Volume –" : `Volume ${a.level_db} dB`);
+  setHidden(n.chat, !a.chat);
+  const chatOk = a.chat_status === "connected";
+  setText(n.chat, `Chat ${a.chat_status}${chatOk ? ` · ${a.chat_rate} msgs/10s` : ""}`);
+  setAttr(n.chat, "title", `Chat ${a.chat_status}`);
+  setClass(n.chat, "bad", a.chat && !/^(connected|connecting|starting)/.test(a.chat_status));
+  setText(n.count, `${a.clips} auto clip${a.clips === 1 ? "" : "s"}`);
+  setHidden(n.pending, !a.pending);
+  const evKey = a.events.map((e) => e.time).join();
+  if (evKey !== n.evKey) {
+    n.evKey = evKey;
+    n.events.replaceChildren(...a.events.slice().reverse().map((e) => {
+      const li = document.createElement("li"), t = document.createElement("time");
+      t.textContent = clock(e.time);
+      li.append(t, `${e.kind === "loud" ? "Loud" : "Chat spike"} (${e.detail})`);
+      return li;
+    }));
+  }
+}
+// Put keyed nodes into `box` in order, moving only those that are out of place
+// (moving a node that holds a <video> or <iframe> would interrupt it).
+function reconcile(box, nodes, items, make, update) {
+  const keep = new Set(items.map((x) => x.id));
+  for (const [id, n] of nodes) if (!keep.has(id)) { n.el.remove(); nodes.delete(id); }
+  items.forEach((x, i) => {
+    let n = nodes.get(x.id);
+    if (!n) { n = make(x); nodes.set(x.id, n); }
+    update(n, x);
+    const at = box.children[i];
+    if (at !== n.el) box.insertBefore(n.el, at || null);
+  });
+}
+function renderRecorders() {
+  reconcile($("recorders"), recNodes, recs.slice().reverse(), makeRec, updateRec);
+  setHidden($("liveSection"), !recs.length);
+  if (revealRec && recNodes.has(revealRec)) {
+    recNodes.get(revealRec).el.scrollIntoView({ block: "nearest", behavior: reduceMotion.matches ? "auto" : "smooth" });
+    revealRec = null;
+  }
+}
+
+function clipLive(r, before, after = 0) {
+  const label = `Clipping last ${before}s${after ? ` + next ${after}s` : ""}…`;
+  return post(`/api/live/${r.id}/clip`, { seconds_before: before, seconds_after: after, vertical: $("liveVertical").checked })
+    .then(() => { toast(label, "ok"); kick(); });
+}
+$("recorders").addEventListener("change", (e) => {
+  if (e.target.classList.contains("rec-vertical")) setLiveVertical(e.target.checked);
+});
+$("recorders").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const id = b.closest(".rec").dataset.id, r = recs.find((x) => x.id === id), n = recNodes.get(id);
+  if (!r) return;
+  try {
+    switch (b.dataset.act) {
+      case "clip": await clipLive(r, +b.dataset.s, +(b.dataset.a || 0)); break;
+      case "stop": await busy(b, "Stopping…", () => post(`/api/live/${id}/stop`)); kick(); break;
+      case "del": await api(`/api/live/${id}`, { method: "DELETE" }); kick(); break;
+      case "auto":
+        await busy(b, null, () => post(`/api/live/${id}/auto`, r.auto ? { audio: false, chat: false } : autoSettings()));
+        kick(); break;
+      case "watch":
+        if (n.watch.firstChild) n.watch.replaceChildren();
+        else {
+          const box = document.createElement("div"), f = document.createElement("iframe");
+          box.className = "player";
+          f.src = `https://www.youtube.com/embed/${encodeURIComponent(r.youtube_id)}?autoplay=1&mute=1&playsinline=1`;
+          f.allow = "autoplay; fullscreen; picture-in-picture"; f.title = "Live stream video";
+          box.appendChild(f); n.watch.appendChild(box);
+        }
+        updateRec(n, r); break;
+    }
+  } catch (err) { toast(err.message, "error"); }
 });
 
-let lastJobs = "";
+document.addEventListener("keydown", (e) => {
+  if (typing(e)) return;
+  const k = e.key.toLowerCase();
+  if (k === "i") markIn();
+  else if (k === "o") markOut();
+  else if (k === "c" && !e.repeat) {
+    const r = [...recs].reverse().find((x) => x.status === "recording" && x.buffered);
+    if (r) clipLive(r, 30).catch((err) => toast(err.message, "error"));
+    else toast(recs.some((x) => x.status === "recording") ? "Nothing buffered to clip yet." : "No live stream is recording — start watching one first.");
+  }
+});
+
+// -- clips --------------------------------------------------------------------------
+const KIND = { vod: "Video", live: "Live", auto: "Auto", edit: "9:16" };
+const clipNodes = new Map();
+const lazy = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
+  for (const en of entries) if (en.isIntersecting) { loadVideo(en.target); lazy.unobserve(en.target); }
+}, { rootMargin: "300px" }) : null;
+function loadVideo(v) { if (!v.src) { v.preload = "metadata"; v.src = v.dataset.src; } }
+
+function makeClip(j) {
+  const el = $("clipTpl").content.firstElementChild.cloneNode(true), q = (s) => el.querySelector(s);
+  el.dataset.id = j.id;
+  // A label ends with " · <source url>" for video/live clips; show that part on its own line.
+  const i = j.label.lastIndexOf(" · "), tail = i >= 0 ? j.label.slice(i + 3) : "";
+  const src = tail.includes("://") ? tail : "", title = src ? j.label.slice(0, i) : j.label;
+  q(".badge").textContent = KIND[j.kind] || j.kind; q(".badge").classList.add(j.kind);
+  q("time").textContent = clock(j.created); q("time").dateTime = new Date(j.created * 1000).toISOString();
+  q(".clip-title").textContent = title;
+  q(".clip-src").textContent = src; q(".clip-src").title = src; q(".clip-src").hidden = !src;
+  return { el, thumb: q(".thumb"), err: q(".clip-err"), acts: q(".clip-acts"), dl: q(".dl"), vert: q('[data-act="vertical"]'),
+           status: null, timer: null };
+}
+function updateClip(n, j) {
+  if (j.status === "running") {
+    // Elapsed time ticks on every poll; just update the text.
+    if (n.status !== "running") {
+      n.thumb.innerHTML = `<div class="working"><div class="spinner" aria-hidden="true"></div><span>Working…</span></div>`;
+      n.timer = n.thumb.querySelector("span");
+    }
+    const s = Math.max(0, Math.round(Date.now() / 1000 - j.created));
+    setText(n.timer, s >= 3 ? `Working… ${dur(s)}` : "Working…");
+  }
+  if (n.status === j.status) return;
+  n.status = j.status;
+  n.el.className = `clip ${j.status}`;
+  if (j.status === "done") {
+    const f = encodeURIComponent(j.file);
+    const v = document.createElement("video");
+    v.controls = true; v.playsInline = true; v.preload = "none"; v.dataset.src = `/clips/${f}#t=0.1`;
+    v.setAttribute("aria-label", `Clip ${j.file}`);
+    n.thumb.replaceChildren(v);
+    if (lazy) lazy.observe(v); else loadVideo(v);
+    n.dl.href = `/clips/${f}`; n.dl.title = j.file; n.dl.setAttribute("aria-label", `Download ${j.file}`);
+    n.vert.dataset.file = j.file;
+    n.vert.hidden = j.file.endsWith("_9x16.mp4");
+    n.acts.hidden = false; n.err.hidden = true;
+  } else if (j.status === "error") {
+    n.thumb.textContent = "Failed";
+    n.err.textContent = j.error || "Something went wrong."; n.err.hidden = false; n.acts.hidden = true;
+  }
+}
 function renderJobs(jobs) {
-  const key = JSON.stringify(jobs.map(j => [j.id, j.status]));
-  if (key === lastJobs) return; lastJobs = key;
-  $("clips").innerHTML = jobs.length ? jobs.map(j => `
-    <div class="clip">
-      ${j.status === "done" ? `<video src="/clips/${encodeURIComponent(j.file)}" controls preload="metadata"></video>` : ""}
-      <div class="label">${esc(j.label)}</div>
-      ${j.status === "running" ? `<div class="muted">⏳ Working…</div>` : ""}
-      ${j.status === "error" ? `<div class="err">${esc(j.error)}</div>` : ""}
-      ${j.status === "done" ? `<a href="/clips/${encodeURIComponent(j.file)}" download>Download ${esc(j.file)}</a>` : ""}
-    </div>`).join("") : `<div class="muted">No clips yet.</div>`;
+  reconcile($("clips"), clipNodes, jobs, makeClip, updateClip);
+  setHidden($("clipsEmpty"), jobs.length);
+  const done = jobs.filter((j) => j.status === "done").length;
+  setText($("clipCount"), jobs.length ? `${done} saved` : "");
+}
+$("clips").addEventListener("click", async (e) => {
+  const b = e.target.closest('button[data-act="vertical"]'); if (!b) return;
+  try {
+    await busy(b, "Starting…", () => post(`/api/clips/${encodeURIComponent(b.dataset.file)}/vertical`, { focus: 0.5 }));
+    toast("Making a 9:16 copy…", "ok"); kick();
+  } catch (err) { toast(err.message, "error"); }
+});
+
+// -- polling ------------------------------------------------------------------------
+// One request per tick. Fast while something is recording or rendering, backing
+// off to 10s when idle, and paused while the tab is hidden.
+let pollTimer = 0, inflight = false, again = false, stopped = false, idle = 0, lastText = "", offline = false, useState = true;
+let running = 0, recording = 0;
+
+async function fetchState() {
+  if (useState) {
+    const res = await fetch("/api/state", { cache: "no-store" });
+    if (res.status !== 404) { if (!res.ok) throw new Error(res.statusText); return res.text(); }
+    useState = false;  // older server without /api/state
+  }
+  const [l, j] = await Promise.all(["/api/live", "/api/jobs"].map((p) => fetch(p, { cache: "no-store" }).then((r) => {
+    if (!r.ok) throw new Error(r.statusText); return r.text(); })));
+  return `{"live":${l},"jobs":${j}}`;
+}
+function renderSummary() {
+  const s = $("summary"), bits = [];
+  if (offline) { s.innerHTML = `<span class="offline">Can't reach Clipper — retrying…</span>`; return; }
+  if (recording) bits.push(`<span class="live">● ${recording} recording</span>`);
+  if (running) bits.push(`${running} clip${running === 1 ? "" : "s"} in progress`);
+  const html = bits.join(" · ");
+  if (s.innerHTML !== html) s.innerHTML = html;
+}
+function render(state) {
+  recs = state.live;
+  recording = recs.filter((r) => r.status === "recording").length;
+  running = state.jobs.filter((j) => j.status === "running").length;
+  renderRecorders(); renderJobs(state.jobs);
+}
+function nextDelay() {
+  if (offline) return Math.min(10000, 2000 * 2 ** Math.min(idle++, 3));
+  if (running) { idle = 0; return 1000; }
+  if (recording) { idle = 0; return 1500; }
+  return [2000, 3000, 5000, 8000, 10000][Math.min(idle++, 4)];
+}
+function schedule(ms) {
+  clearTimeout(pollTimer);
+  if (!stopped && !document.hidden) pollTimer = setTimeout(refresh, ms);
+}
+async function refresh() {
+  if (stopped) return;
+  if (inflight) { again = true; return; }
+  inflight = true; clearTimeout(pollTimer);
+  try {
+    const text = await fetchState();
+    if (stopped) return;
+    if (offline) { offline = false; idle = 0; }
+    if (text !== lastText) { lastText = text; render(JSON.parse(text)); }
+  } catch {
+    offline = true;
+  } finally {
+    inflight = false;
+  }
+  if (stopped) return;
+  renderSummary();
+  if (again) { again = false; return refresh(); }
+  schedule(nextDelay());
+}
+// Something just changed: poll right away and go back to the fast pace.
+function kick() { idle = 0; refresh(); }
+document.addEventListener("visibilitychange", () => { if (document.hidden) clearTimeout(pollTimer); else kick(); });
+
+// -- quit ---------------------------------------------------------------------------
+$("quit").onclick = () => {
+  const dlg = $("quitDlg");
+  if (typeof dlg.showModal !== "function") { if (confirm("Quit Clipper? Any live recordings stop. Saved clips are kept.")) quit(); return; }
+  dlg.returnValue = ""; dlg.showModal();
+};
+$("quitDlg").addEventListener("close", () => { if ($("quitDlg").returnValue === "quit") quit(); });
+async function quit() {
+  stopped = true; clearTimeout(pollTimer);
+  try { await post("/api/quit"); } catch {}
+  $("app").innerHTML = `<header class="top"><h1 class="brand">✂ <span>Clipper</span></h1></header>
+    <div class="panel" style="margin-top:24px"><h2>Clipper has stopped</h2><p class="lede">You can close this tab.</p></div>`;
+  document.title = "Clipper (stopped)";
 }
 
-async function refresh() {
-  try {
-    const [r, j] = await Promise.all([api("/api/live"), api("/api/jobs")]);
-    recs = r; renderRecorders(); renderJobs(j);
-  } catch (e) { /* server restarting */ }
-}
-refresh(); setInterval(refresh, 1500);
+renderJobs([]);
+refresh();
 </script>
 </body>
 </html>
