@@ -21,7 +21,7 @@ function make(r) {
   root.dataset.id = r.id;
   const n = {
     el: root, r, evKey: "", fillVal: -1,
-    tally: q(".tally"), state: q(".mon-state"), tc: q(".mon-tc"), url: q(".mon-url"), bufTxt: q(".buf-txt"), fill: q(".buf-fill"),
+    tally: q(".tally"), state: q(".mon-state-text"), pill: q(".mon-state"), tc: q(".mon-tc"), url: q(".mon-url"), bufTxt: q(".buf-txt"), fill: q(".buf-fill"),
     sel: q(".buf-sel"), marks: q(".buf-marks"), t0: q(".t0"), t1: q(".t1"), err: q(".mon-err"), watch: q(".watch"),
     clips: [...root.querySelectorAll('[data-act="clip"]')], vertical: q(".rec-vertical"), wait: q(".mon-wait"),
     auto: q(".auto"), mode: q(".auto-mode"), vol: q(".auto-vol"), volBar: q(".vu i"), volTxt: q(".auto-vol b"),
@@ -59,6 +59,7 @@ function update(n, r) {
   setClass(n.el, "is-rec", live);
   setAttr(n.tally, "class", `tally${live ? " on" : r.status === "error" ? " err" : ""}`);
   setText(n.state, STATUS[r.status] || r.status);
+  setAttr(n.pill, "class", `pill mon-state ${live ? "live" : r.status === "error" ? "err" : ""}`);
   setText(n.url, r.url); setAttr(n.url, "title", r.url);
   setAttr(n.url, "href", /^https?:\/\//i.test(r.url) ? r.url : null);
   if (!r.started_at) setText(n.tc, "--:--:--");
@@ -103,7 +104,8 @@ function update(n, r) {
   const chatOk = a.chat_status === "connected";
   setText(n.chatTxt, `${a.chat_status}${chatOk ? ` · ${a.chat_rate} msgs/10s` : ""}`);
   setAttr(n.chat, "title", `Chat ${a.chat_status}`);
-  setClass(n.chat, "bad", a.chat && !/^(connected|connecting|starting)/.test(a.chat_status));
+  const chatBusy = /^(connecting|starting)/.test(a.chat_status);
+  setAttr(n.chatTxt, "class", `pill ${chatOk ? "ok" : chatBusy ? "warn" : "err"}`);
   setText(n.count, plural(a.clips, "auto clip"));
   setHidden(n.pending, !a.pending);
 }

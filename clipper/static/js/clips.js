@@ -18,7 +18,7 @@ function make(j) {
   q(".clip-src").textContent = prettySource(src); q(".clip-src").title = src; q(".clip-src").hidden = !src;
   q(".clip-when").textContent = clock(j.created);
   const n = { el: root, j, title: q(".clip-title").textContent, thumb: q(".thumb"), state: q(".state"), dur: q(".dur"),
-              err: q(".clip-err"), acts: q(".clip-acts"), dl: q(".dl"), vert: q('[data-act="vertical"]'), status: null, timer: null };
+              err: q(".clip-err"), acts: q(".clip-acts"), pill: q(".clip-pill"), dl: q(".dl"), vert: q('[data-act="vertical"]'), status: null, timer: null };
   setClass(n.thumb, "portrait", isPortrait(j));
   return n;
 }
@@ -37,6 +37,8 @@ function update(n, j) {
   if (n.status === j.status) return;
   n.status = j.status;
   n.el.className = `clip ${j.status}`;
+  const [kind, word] = { running: ["warn", "Making"], done: ["ok", "Ready"], error: ["err", "Failed"] }[j.status] || ["", j.status];
+  n.pill.className = `pill clip-pill ${kind}`; n.pill.textContent = word;
   if (j.status === "done") {
     const f = encodeURIComponent(j.file);
     setClass(n.thumb, "portrait", isPortrait(j));

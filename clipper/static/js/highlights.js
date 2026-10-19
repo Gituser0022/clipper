@@ -90,8 +90,14 @@ function render() {
     setText($("hlStatus"), a.duration ? `Listening to the audio… ${Math.round(p * 100)}%  (${dur(a.levels.length)} of ${dur(D)})`
                                       : `Listening to the audio… ${dur(a.levels.length)} so far`);
   } else show("done");
+  setPill(a.status === "analyzing" ? ["warn", `Analysing · ${Math.round((a.progress || 0) * 100)}%`] : ["ok", "Done"]);
   axis(D);
   queueDraw();
+}
+
+function setPill([kind, text]) {
+  const p = $("hlPill");
+  setAttr(p, "class", `pill ${kind}`); setText(p, text);
 }
 
 // -- moments ------------------------------------------------------------------------
@@ -149,6 +155,7 @@ function renderMoments() {
     return card;
   }));
   setHidden($("hlNone"), list.length > 0);
+  setPill(["ok", `Done · ${plural(list.length, "moment")}`]);
   summarize();
 }
 function summarize() {
@@ -208,7 +215,9 @@ function axis(D) {
 }
 const queueDraw = () => { if (!drawQueued) { drawQueued = true; requestAnimationFrame(draw); } };
 new ResizeObserver(queueDraw).observe($("hlGraph"));
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+// Colours come from the theme tokens in app.css, so redraw when the theme changes.
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", queueDraw);
+document.addEventListener("clipper:theme", queueDraw);
 
 function draw() {
   drawQueued = false;
@@ -226,20 +235,23 @@ function draw() {
   const floor = Math.max(-70, (sorted[Math.floor(sorted.length * 0.02)] ?? -60) - 3), ceil = (sorted.at(-1) ?? 0) + 1;
   const top = 26, mid = top + (h - top) / 2, amp = (h - top) / 2 - 4;
   const sel = chosen(), windows = all();
+  const cs = getComputedStyle(document.documentElement), css = (name) => cs.getPropertyValue(name).trim();
+  const accent = css("--accent"), markerOff = css("--graph-marker-off");
 
   // Not analysed yet.
   if (a.status === "analyzing" && L.length < D) {
-    g.fillStyle = "rgba(255,255,255,.03)";
+    g.fillStyle = css("--graph-pending");
     g.fillRect(x(L.length), top, w - x(L.length), h - top);
   }
   // Clip windows.
   for (const m of windows) {
     const on = !unchecked.has(key(m));
-    g.fillStyle = on ? "rgba(255,77,94,.16)" : "rgba(255,255,255,.04)";
+    g.fillStyle = on ? css("--graph-window") : css("--graph-window-off");
     g.fillRect(x(m.start), top, Math.max(1, x(m.end) - x(m.start)), h - top);
   }
   // Waveform: one mirrored bar per 3px, showing the loudest second in it.
-  const quiet = css("--wave") || "#4f5b72", hot = css("--tally") || "#ff4d5e";
+  // Ink-grey bars; darker inside the parts that become clips.
+  const quiet = css("--graph-bar"), hot = css("--graph-bar-on");
   for (let px = 0; px < w; px += 3) {
     const t0 = Math.floor((px / w) * D), t1 = Math.max(t0 + 1, Math.floor(((px + 3) / w) * D));
     let peak = null;
@@ -255,14 +267,14 @@ function draw() {
   g.textAlign = "center"; g.textBaseline = "middle";
   windows.forEach((m, i) => {
     const on = !unchecked.has(key(m)), mx = x(m.t);
-    g.strokeStyle = on ? hot : "rgba(255,255,255,.25)"; g.lineWidth = 1.5;
+    g.strokeStyle = on ? accent : markerOff; g.lineWidth = 1.5;
     g.beginPath(); g.moveTo(mx, top - 2); g.lineTo(mx, h); g.stroke();
-    g.fillStyle = on ? hot : "#39414f";
+    g.fillStyle = on ? accent : markerOff;
     g.beginPath(); g.arc(mx, 12, 10, 0, Math.PI * 2); g.fill();
-    g.fillStyle = "#fff"; g.fillText(String(i + 1), mx, 12.5);
+    g.fillStyle = on ? css("--accent-fg") : "#fff"; g.fillText(String(i + 1), mx, 12.5);
   });
   // Hover and the clicked spot.
-  for (const [t, color] of [[hoverT, "rgba(255,255,255,.35)"], [cursorT, "#fff"]]) {
+  for (const [t, color] of [[hoverT, css("--graph-hover")], [cursorT, css("--text")]]) {
     if (t == null) continue;
     g.strokeStyle = color; g.lineWidth = 1;
     g.beginPath(); g.moveTo(x(t), top); g.lineTo(x(t), h); g.stroke();

@@ -50,6 +50,27 @@ document.addEventListener("keydown", (e) => {
   else if (k === "c" && !e.repeat) clipNewest();
 });
 
+// -- colour theme: automatic (follows the system), light or dark ------------------------
+const ICON = (body) => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">${body}</svg>`;
+const THEMES = {
+  auto: [ICON('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>'), "automatic"],
+  light: [ICON('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'), "light"],
+  dark: [ICON('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'), "dark"],
+};
+function applyTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  const [icon, name] = THEMES[t], btn = $("themeBtn");
+  btn.innerHTML = icon; btn.title = `Colour theme: ${name}`; btn.setAttribute("aria-label", `Colour theme: ${name}. Click to change.`);
+  document.dispatchEvent(new CustomEvent("clipper:theme"));
+}
+let theme = document.documentElement.dataset.theme || "auto";
+$("themeBtn").onclick = () => {
+  theme = { auto: "light", light: "dark", dark: "auto" }[theme];
+  try { if (theme === "auto") localStorage.removeItem("clipper.theme"); else localStorage.setItem("clipper.theme", theme); } catch {}
+  applyTheme(theme);
+};
+applyTheme(theme);
+
 // -- quit -----------------------------------------------------------------------------
 $("quit").onclick = () => {
   const dlg = $("quitDlg");

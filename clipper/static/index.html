@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#0b0e13">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 <title>Clipper</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 rx=%2224%22 fill=%22%23ff4d5e%22/%3E%3Ctext x=%2250%22 y=%2272%22 font-size=%2262%22 text-anchor=%22middle%22 fill=%22white%22%3E%E2%9C%82%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 rx=%2224%22 fill=%22%23171717%22/%3E%3Ctext x=%2250%22 y=%2272%22 font-size=%2262%22 text-anchor=%22middle%22 fill=%22white%22%3E%E2%9C%82%3C/text%3E%3C/svg%3E">
 <link rel="preload" href="fonts/pacifico-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="fonts/archivo-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
+<script>/* apply a saved light / dark choice before the first paint */ try { const t = localStorage.getItem("clipper.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="stylesheet" href="app.css">
 <script type="module" src="js/main.js"></script>
 </head>
@@ -26,7 +28,8 @@
         <a href="#/clips" data-view="clips"><span class="nav-ico" aria-hidden="true">▦</span><span>My clips</span><span class="badge" id="navClips" hidden></span></a>
       </nav>
       <span class="offline" id="offline" role="status" hidden>Can't reach Clipper — retrying…</span>
-      <button type="button" class="btn quiet sm quit" id="quit" title="Stop Clipper and all recordings">Quit</button>
+      <button type="button" class="btn quiet sm icon theme-btn quit" id="themeBtn" aria-label="Colour theme: automatic" title="Colour theme: automatic"></button>
+      <button type="button" class="btn quiet sm" id="quit" title="Stop Clipper and all recordings">Quit</button>
     </div>
   </header>
 
@@ -34,6 +37,7 @@
     <!-- ============================== MAKE A CLIP ============================== -->
     <section class="view" id="view-make" aria-labelledby="makeTitle">
       <div class="page-head center">
+        <p class="eyebrow">New clip</p>
         <h1 id="makeTitle">Make a clip</h1>
         <p>Paste a link, choose what you want, and Clipper does the rest.</p>
       </div>
@@ -42,6 +46,7 @@
         <li class="step" id="step1">
           <div class="step-num" aria-hidden="true"><span>1</span></div>
           <div class="step-card">
+            <p class="eyebrow">Step 1</p>
             <h2>Paste a link</h2>
             <p class="step-sub">A YouTube or Twitch video, a past stream, or a channel that is live right now.</p>
             <form class="linkbar" id="linkForm" novalidate>
@@ -57,6 +62,7 @@
         <li class="step" id="step2" hidden>
           <div class="step-num" aria-hidden="true"><span>2</span></div>
           <div class="step-card">
+            <p class="eyebrow">Step 2</p>
             <h2 id="step2Title">How do you want to clip it?</h2>
             <div class="source">
               <div class="source-thumb" id="srcThumb" aria-hidden="true"></div>
@@ -136,6 +142,7 @@
         <li class="step" id="step3" hidden>
           <div class="step-num" aria-hidden="true"><span>3</span></div>
           <div class="step-card">
+            <p class="eyebrow">Step 3</p>
             <h2 id="step3Title">Find the best moments</h2>
             <div class="screen" id="playerBox">
               <div id="playerMount"></div>
@@ -151,6 +158,7 @@
               <div class="hl-progress" id="hlProgress" hidden>
                 <div class="hl-progress-row">
                   <span class="spinner" aria-hidden="true"></span>
+                  <span class="pill warn">Analysing</span>
                   <span id="hlStatus" aria-live="polite">Listening to the audio…</span>
                   <span class="grow"></span>
                   <button type="button" class="btn sm quiet" id="hlCancel">Stop</button>
@@ -166,7 +174,7 @@
               </div>
               <div class="graph-box" id="hlGraphBox" hidden>
                 <div class="graph-head">
-                  <span class="label">Loudness over the whole video</span>
+                  <span class="graph-head-left"><span class="label">Loudness over the whole video</span><span class="pill" id="hlPill"></span></span>
                   <span class="legend"><i class="lg-sel"></i> becomes a clip <i class="lg-mark"></i> loud moment</span>
                 </div>
                 <div class="graph-wrap">
@@ -240,7 +248,7 @@
       </ol>
 
       <div class="explain" id="explain">
-        <h2 class="explain-title">What Clipper can do</h2>
+        <h2 class="eyebrow center">What Clipper can do</h2>
         <div class="explain-grid">
           <div class="ex"><span class="ex-ico" aria-hidden="true">🔊</span><b>Best moments from a video</b><span>Paste a video and get its loudest moments as separate clips.</span></div>
           <div class="ex"><span class="ex-ico" aria-hidden="true">✂</span><b>Your own start and end</b><span>Pick the exact part of a video to keep.</span></div>
@@ -252,6 +260,7 @@
     <!-- ============================== RECORDING ============================== -->
     <section class="view" id="view-recording" aria-labelledby="recTitle" hidden>
       <div class="page-head">
+        <p class="eyebrow">Live</p>
         <h1 id="recTitle">Recording</h1>
         <p id="recHint">When something happens, press a button. Clipper saves what <em>already</em> happened. Press <kbd>C</kbd> to save the last 30 seconds.</p>
       </div>
@@ -267,6 +276,7 @@
     <!-- ============================== MY CLIPS ============================== -->
     <section class="view" id="view-clips" aria-labelledby="clipsTitle" hidden>
       <div class="page-head">
+        <p class="eyebrow">Library</p>
         <h1 id="clipsTitle">My clips</h1>
         <p id="clipCount"></p>
       </div>
@@ -326,8 +336,7 @@
 <template id="recTpl">
   <article class="mon">
     <header class="mon-head">
-      <span class="tally" aria-hidden="true"></span>
-      <span class="mon-state"></span>
+      <span class="pill mon-state"><span class="tally" aria-hidden="true"></span><span class="mon-state-text"></span></span>
       <span class="mon-tc mono" title="Time since recording started"></span>
       <a class="mon-url" target="_blank" rel="noopener noreferrer"></a>
       <div class="mon-tools">
@@ -390,7 +399,7 @@
     <div class="clip-body">
       <div class="clip-title"></div>
       <div class="clip-src"></div>
-      <div class="clip-when mono"></div>
+      <div class="clip-meta"><span class="pill clip-pill"></span><span class="clip-when mono"></span></div>
       <div class="err clip-err" hidden></div>
       <div class="clip-acts" hidden>
         <a class="btn sm dl" download>↓ Download</a>
