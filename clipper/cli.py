@@ -104,7 +104,8 @@ def cmd_live(args):
     finally:
         if auto:
             auto.stop()
-        rec.stop()
+        rec.discard()
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def add_vertical_args(p, help_text):

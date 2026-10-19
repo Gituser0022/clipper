@@ -72,3 +72,23 @@ def test_quit_calls_shutdown(client, monkeypatch):
     assert client.post("/api/quit").json() == {"ok": True}
     time.sleep(0.6)
     assert called == [1]
+
+
+def test_remove_deletes_the_buffer_from_disk(client):
+    rec = client.post("/api/live/start", json={"url": "fake://live", "buffer_seconds": 60}).json()
+    buf = server.recorders[rec["id"]].buf_dir
+    deadline = time.time() + 30
+    while not list(buf.glob("seg_*.ts")) and time.time() < deadline:
+        time.sleep(0.5)
+    assert list(buf.glob("seg_*.ts"))
+    client.delete(f"/api/live/{rec['id']}")
+    assert not buf.exists()
+
+
+def test_startup_clears_stale_buffers(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "WORK_DIR", tmp_path / "work")
+    stale = tmp_path / "work" / "buffer_dead"
+    stale.mkdir(parents=True)
+    (stale / "seg_00000001.ts").write_bytes(b"x" * 100)
+    with TestClient(server.app):
+        assert not stale.exists()

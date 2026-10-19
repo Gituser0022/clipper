@@ -103,6 +103,9 @@ class FakeRecorder:
     def stop(self):
         events.append("recorder.stop")
 
+    def discard(self):
+        self.stop()
+
 
 class FakeAuto:
     def __init__(self, rec, out_dir, **kw):

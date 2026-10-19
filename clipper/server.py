@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
@@ -38,11 +39,14 @@ Url = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\w[\w+.
 
 @asynccontextmanager
 async def lifespan(app):
+    # Buffers left behind by a crash or a forced quit are of no use any more.
+    for stale in WORK_DIR.glob("buffer_*"):
+        shutil.rmtree(stale, ignore_errors=True)
     yield
     for auto in autoclippers.values():
         auto.stop()
     for rec in recorders.values():
-        rec.stop()
+        rec.discard()
 
 
 app = FastAPI(title="Clipper", lifespan=lifespan)
@@ -246,7 +250,7 @@ def live_remove(rec_id: str):
         auto.stop()
     rec = recorders.pop(rec_id, None)
     if rec:
-        rec.stop()
+        rec.discard()
     return {"ok": True}
 
 

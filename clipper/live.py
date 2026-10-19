@@ -7,6 +7,7 @@ no re-encoding.
 """
 
 import csv
+import shutil
 import subprocess
 import threading
 import time
@@ -133,6 +134,11 @@ class LiveRecorder:
                     proc.kill()
         if self.status == "recording":
             self.status = "stopped"
+
+    def discard(self):
+        """Stop and delete the buffer from disk (nothing can be clipped after this)."""
+        self.stop()
+        shutil.rmtree(self.buf_dir, ignore_errors=True)
 
     # -- buffer ---------------------------------------------------------------
 
