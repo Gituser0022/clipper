@@ -17,6 +17,10 @@ from pathlib import Path
 
 from .ytdlp import base_args
 
+# A single combined stream if there is one; otherwise H.264 video + AAC audio,
+# which yt-dlp merges on the fly (these codecs fit in the MPEG-TS buffer).
+LIVE_FORMAT = "b/bv*[vcodec^=avc1][height<=1080]+ba[acodec^=mp4a]/bv*+ba"
+
 
 @dataclass
 class Segment:
@@ -39,7 +43,7 @@ def select_segments(segments, seconds):
 
 class LiveRecorder:
     def __init__(self, url, work_dir, buffer_seconds=300, segment_seconds=2,
-                 fmt="b", producer_cmd=None):
+                 fmt=LIVE_FORMAT, producer_cmd=None):
         self.id = uuid.uuid4().hex[:8]
         self.url = url
         self.buffer_seconds = buffer_seconds
