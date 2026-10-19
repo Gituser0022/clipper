@@ -75,7 +75,11 @@ const $ = (id) => document.getElementById(id);
 async function api(path, opts = {}) {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.detail ? JSON.stringify(body.detail) : res.statusText);
+  if (!res.ok) {
+    const d = body.detail;
+    const msg = Array.isArray(d) ? d.map(e => `${e.loc?.at(-1) ?? ""}: ${e.msg}`).join("\n") : d;
+    throw new Error(msg || res.statusText);
+  }
   return body;
 }
 const post = (path, data) => api(path, { method: "POST", body: JSON.stringify(data || {}) });
@@ -91,7 +95,10 @@ $("vodGo").onclick = async () => {
 
 $("liveGo").onclick = async () => {
   try {
-    await post("/api/live/start", { url: $("liveUrl").value.trim(), buffer_seconds: Math.round($("liveBuf").value * 60) });
+    // Empty or out-of-range buffer falls back to 5 minutes / clamps to 1–180.
+    const minutes = Math.min(180, Math.max(1, Number($("liveBuf").value) || 5));
+    $("liveBuf").value = minutes;
+    await post("/api/live/start", { url: $("liveUrl").value.trim(), buffer_seconds: Math.round(minutes * 60) });
     refresh();
   } catch (e) { alert(e.message); }
 };
