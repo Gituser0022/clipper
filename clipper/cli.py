@@ -16,7 +16,7 @@ def cmd_serve(args):
     import os
     import uvicorn
     os.environ["CLIPPER_DATA"] = str(Path(args.data).resolve())
-    uvicorn.run("clipper.server:app", host=args.host, port=args.port)
+    uvicorn.run("clipper.server:app", host=args.host, port=args.port, access_log=False)
 
 
 def cmd_vod(args):
