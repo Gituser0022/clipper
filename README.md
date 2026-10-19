@@ -47,7 +47,7 @@ pip install -e '.[dev]' && pytest
 The tests simulate a live stream with ffmpeg, so they need no internet.
 
 ## Notes
-- If YouTube starts failing, update yt-dlp first: `pip install -U yt-dlp`.
+- If YouTube starts failing, update yt-dlp first: `pip install -U "yt-dlp[default]"`.
 - For members-only or age-restricted content, yt-dlp can use your browser's
   cookies (`--cookies-from-browser`).
 - Respect creators' rights and platform terms — clip content you own or have
