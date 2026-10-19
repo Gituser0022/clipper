@@ -7,10 +7,16 @@
 <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
 <title>Clipper</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect width=%22100%22 height=%22100%22 rx=%2224%22 fill=%22%23171717%22/%3E%3Ctext x=%2250%22 y=%2272%22 font-size=%2262%22 text-anchor=%22middle%22 fill=%22white%22%3E%E2%9C%82%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/pacifico-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <script>/* apply a saved light / dark choice before the first paint */ try { const t = localStorage.getItem("clipper.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Clipper">
 <link rel="stylesheet" href="app.css">
 <script type="module" src="js/main.js"></script>
 </head>
@@ -33,7 +39,8 @@
         <button type="button" class="pill storage-pill" id="storagePill" hidden></button>
         <button type="button" class="btn quiet sm icon" id="settingsBtn" aria-label="Storage and settings" title="Storage and settings"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <button type="button" class="btn quiet sm icon theme-btn" id="themeBtn" aria-label="Colour theme: automatic" title="Colour theme: automatic"></button>
-        <button type="button" class="btn quiet sm" id="quit" title="Stop Clipper and all recordings">Quit</button>
+        <span class="pill ok remote-pill" id="remotePill" role="status" hidden>Connected to your Mac</span>
+        <button type="button" class="btn quiet sm mac-only" id="quit" title="Stop Clipper and all recordings">Quit</button>
       </div>
     </div>
   </header>
@@ -368,6 +375,7 @@
     <span class="viewer-wave" aria-hidden="true"><svg viewBox="0 0 64 32"><path d="M2 16h4M10 10v12M16 4v24M22 12v8M28 7v18M34 2v28M40 9v14M46 13v6M52 6v20M58 11v10M62 16h0"/></svg></span>
     <audio id="viewerAudio" controls preload="none"></audio>
   </div>
+  <p class="viewer-hint remote-only">Saves to Files. To put it in Photos: open it in Files → Share → Save Video.</p>
   <p class="viewer-note" id="viewerNote" hidden>This browser can't play this file. Download it and open it in QuickTime or VLC.</p>
   <div class="viewer-bar">
     <div class="viewer-title" id="viewerTitle"></div>
@@ -389,11 +397,12 @@
       <div class="st-free" id="stFree"></div>
     </div>
     <div class="st-section">
-      <div class="label">Where Clipper saves things</div>
-      <div class="st-main"><span class="mono" id="stFolder"></span><span class="grow"></span><button type="button" class="btn sm" id="stOpenMain">Show in Finder</button></div>
+      <div class="label mac-only">Where Clipper saves things</div>
+      <div class="label remote-only">What's on your Mac</div>
+      <div class="st-main"><span class="mono" id="stFolder"></span><span class="grow"></span><button type="button" class="btn sm mac-only" id="stOpenMain">Show in Finder</button></div>
       <div class="st-rows" id="stRows"></div>
     </div>
-    <div class="st-section">
+    <div class="st-section mac-only">
       <div class="label" id="stLimitLabel">How much Clipper may use</div>
       <div class="st-limit">
         <input class="input mono" id="stLimit" type="number" min="1" max="5000" step="1" inputmode="decimal" aria-labelledby="stLimitLabel">
@@ -401,7 +410,7 @@
         <label class="toggle"><input type="checkbox" id="stNoLimit"><span class="sw" aria-hidden="true"></span><span>No limit</span></label>
       </div>
     </div>
-    <div class="st-section">
+    <div class="st-section mac-only">
       <div class="label" id="stWhenLabel">When it's full</div>
       <div class="st-when" role="radiogroup" aria-labelledby="stWhenLabel">
         <label class="st-opt"><input type="radio" name="stWhen" value="stop"><span><b>Stop saving new clips</b><small>Nothing is deleted. New clips fail until you free up space.</small></span></label>
@@ -409,7 +418,40 @@
       </div>
       <p class="callout warn st-warn" id="stWarn" hidden><b>Careful:</b> Clipper will permanently delete your oldest clips, highlights and downloads whenever it needs room. They don't go to the Bin.</p>
     </div>
-    <div class="st-foot">
+    <div class="st-section mac-only" id="remoteSection">
+      <div class="label">Phone &amp; iPad</div>
+      <label class="toggle big">
+        <input type="checkbox" id="rmOn"><span class="sw" aria-hidden="true"></span>
+        <span><b>Let my phone and iPad use Clipper</b><small>They use this Mac over your home Wi-Fi, with a private link.</small></span>
+      </label>
+      <div class="rm" id="rmBody" hidden>
+        <div class="rm-qr"><img id="rmQr" alt="QR code with the private link to this Clipper" width="180" height="180"></div>
+        <div class="rm-info">
+          <ol class="rm-steps">
+            <li>Join the same Wi-Fi as this Mac.</li>
+            <li>Scan with the Camera app.</li>
+            <li>In Safari tap Share → Add to Home Screen.</li>
+          </ol>
+          <div class="label">Or open this link on the phone or iPad</div>
+          <div class="rm-link"><code class="mono" id="rmUrl"></code><button type="button" class="btn sm" id="rmCopy">Copy</button></div>
+          <div class="rm-link alt" id="rmAltRow" hidden><span class="rm-alt-label">If that doesn't open, try</span><code class="mono" id="rmAlt"></code><button type="button" class="btn sm" id="rmCopyAlt">Copy</button></div>
+          <button type="button" class="btn sm" id="rmNew">New link</button>
+        </div>
+      </div>
+      <div class="msg" id="rmMsg" role="alert"></div>
+      <p class="callout warn rm-unreachable" id="rmUnreachable" hidden>Phones can't reach this Mac yet. Open Clipper from Clipper.app, or run <code class="mono">clipper serve --host 0.0.0.0</code>.</p>
+      <p class="hint">Your Mac must be awake with Clipper open.</p>
+    </div>
+    <div class="st-section" id="afterSaveSection" hidden>
+      <div class="label" id="asLabel">After saving to my phone or iPad</div>
+      <div class="st-when" role="radiogroup" aria-labelledby="asLabel">
+        <label class="st-opt"><input type="radio" name="afterSave" value="bin"><span><b>Move it to the Mac's Bin <em class="rec-tag">Recommended</em></b><small>So the video isn't on both. You can put it back from the Bin.</small></span></label>
+        <label class="st-opt"><input type="radio" name="afterSave" value="delete"><span><b>Delete it from the Mac</b><small>Frees the space straight away. It can't be put back.</small></span></label>
+        <label class="st-opt"><input type="radio" name="afterSave" value="keep"><span><b>Keep it on the Mac too</b><small>Nothing changes on the Mac.</small></span></label>
+      </div>
+      <div class="msg" id="asMsg" role="alert"></div>
+    </div>
+    <div class="st-foot mac-only">
       <div class="msg" id="stMsg" role="alert"></div>
       <span class="grow"></span>
       <button type="button" class="btn primary" id="stSave">Save</button>
@@ -423,7 +465,7 @@
     <p id="delText"></p>
     <div class="dlg-acts">
       <button type="submit" class="btn" value="cancel" autofocus>Cancel</button>
-      <button type="submit" class="btn danger-solid" value="delete">Delete</button>
+      <button type="submit" class="btn danger-solid" value="delete" id="delOk">Delete</button>
     </div>
   </form>
 </dialog>
@@ -438,6 +480,35 @@
     </div>
   </form>
 </dialog>
+
+<dialog id="confirmDlg" aria-labelledby="cfTitle">
+  <form method="dialog">
+    <h2 id="cfTitle"></h2>
+    <p id="cfText"></p>
+    <div class="dlg-acts">
+      <button type="submit" class="btn" value="cancel" autofocus>Cancel</button>
+      <button type="submit" class="btn primary" value="ok" id="cfOk">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<template id="notConnectedTpl">
+  <main class="stopped not-connected">
+    <div>
+      <div class="logo stacked">
+        <span class="logo-mark" aria-hidden="true">✂</span>
+        <span class="logo-word">Clipper<svg viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true"><path d="M3 9 C 22 3, 50 2, 70 7 S 93 12, 98 4"/></svg></span>
+      </div>
+      <h1>Not connected to your Mac</h1>
+      <p class="nc-msg"></p>
+      <ol class="rm-steps nc-steps">
+        <li>On your Mac, open Clipper → Settings (the gear) → Phone &amp; iPad.</li>
+        <li>Turn it on and scan the QR code with this device's Camera.</li>
+      </ol>
+      <button type="button" class="btn primary lg nc-retry">Try again</button>
+    </div>
+  </main>
+</template>
 
 <template id="stoppedTpl">
   <main class="stopped">

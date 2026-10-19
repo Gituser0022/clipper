@@ -7,6 +7,7 @@ import "./highlights.js";
 import "./clips.js";
 import "./download.js";
 import "./storage.js";
+import "./remote.js";
 
 // -- pages (#/make, #/recording, #/clips) ------------------------------------------------
 const VIEWS = ["make", "download", "recording", "clips"];
@@ -38,7 +39,7 @@ let primed = false;  // clips that already exist when the page opens aren't "new
 onState((s) => { if (!primed) { primed = true; seenClips = s.jobs.length; } badges(); });
 
 // -- keyboard -------------------------------------------------------------------------
-const dialogOpen = () => ["quitDlg", "viewer", "settingsDlg", "deleteDlg"].some((id) => $(id).open);
+const dialogOpen = () => ["quitDlg", "viewer", "settingsDlg", "deleteDlg", "confirmDlg"].some((id) => $(id).open);
 const typing = (e) => {
   const t = e.target;
   return e.ctrlKey || e.metaKey || e.altKey || t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName) || dialogOpen();
@@ -72,6 +73,18 @@ $("themeBtn").onclick = () => {
   applyTheme(theme);
 };
 applyTheme(theme);
+
+// -- a phone or iPad without the private link --------------------------------------------
+document.addEventListener("clipper:unauthorized", (e) => {
+  for (const id of ["viewer", "settingsDlg", "deleteDlg", "confirmDlg", "quitDlg"]) if ($(id).open) $(id).close();
+  resetPlayer();
+  const page = $("notConnectedTpl").content.firstElementChild.cloneNode(true);
+  page.querySelector(".nc-msg").textContent = e.detail;
+  page.querySelector(".nc-retry").onclick = () => location.reload();
+  $("app").hidden = true;
+  document.body.prepend(page);
+  document.title = "Clipper (not connected)";
+});
 
 // -- quit -----------------------------------------------------------------------------
 $("quit").onclick = () => {

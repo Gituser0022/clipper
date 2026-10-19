@@ -71,7 +71,7 @@ function row(name, path, size, key, minor = false) {
   if (path) left.lastChild.title = path;
   r.append(left, el("span", "st-row-size mono", bytes(size)));
   if (key) {
-    const b = el("button", "btn sm", "Show in Finder"); b.type = "button"; b.dataset.folder = key;
+    const b = el("button", "btn sm mac-only", "Show in Finder"); b.type = "button"; b.dataset.folder = key;
     r.appendChild(b);
   }
   return r;
@@ -84,6 +84,7 @@ export async function openSettings() {
   editing = false;
   setText($("stMsg"), "");
   $("settingsDlg").showModal();
+  document.dispatchEvent(new CustomEvent("clipper:settings-open"));
   try { renderPanel(await api("/api/storage")); }
   catch (e) { if (latest) renderPanel(latest); else setText($("stMsg"), e.message); }
 }

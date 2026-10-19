@@ -3,6 +3,20 @@ import { $, api, post, el, setText, setHidden, setClass, setStyle, setAttr, dur,
          prettySource, store } from "./core.js";
 import { loginHint } from "./download.js";
 import { storage, tilde, renderStatus } from "./storage.js";
+import { device, saveMessage } from "./remote.js";
+// On a phone or iPad, "save" sends the file to the device and (by default) moves it off the Mac.
+const onPhone = () => store.client?.local === false;
+function setSaveLink(a, file) {
+  const f = encodeURIComponent(file);
+  if (onPhone()) {
+    a.href = `/clips/${f}?save=1`;
+    a.textContent = device() === "this device" ? "↓ Save to this device" : `↓ Save to ${device()}`;
+    a.dataset.save = "1";
+  } else {
+    a.href = `/clips/${f}`; a.textContent = "↓ Download"; delete a.dataset.save;
+  }
+  a.title = file; a.setAttribute("aria-label", `${a.textContent.slice(2)}: ${file}`);
+}
 
 const FOLDER = { clips: "Clips", highlights: "Highlights", downloads: "Downloads" };
 const deleted = new Set();  // ids removed here, so a poll already on its way can't bring them back
@@ -95,8 +109,9 @@ function update(n, j) {
     n.thumb.disabled = false;
     n.thumb.setAttribute("aria-label", `${audio ? "Listen to" : "Play"} ${n.title}`);
     if (j.duration) { n.dur.textContent = dur(j.duration); n.dur.hidden = false; }
-    n.dl.href = `/clips/${f}`; n.dl.title = j.file; n.dl.setAttribute("aria-label", `Download ${j.file}`);
+    setSaveLink(n.dl, j.file);
     n.vert.dataset.file = j.file; n.vert.hidden = audio || j.file.endsWith("_9x16.mp4");
+    setText(n.del, canTrash() ? "Move to Bin" : "Delete");
     n.acts.hidden = false; n.err.hidden = true;
   } else if (j.status === "error") {
     n.state.replaceChildren(el("span", "state-icon", "!"),
@@ -118,10 +133,16 @@ onState(render);
 
 // -- delete, with an in-page confirm ----------------------------------------------------
 let toDelete = null;
+// On a Mac the file goes to the Bin (and can be put back); elsewhere it is deleted for good.
+const canTrash = () => !!storage()?.can_trash;
 function confirmDelete(n) {
   const j = n.j, s = storage(), where = s?.folders?.[j.folder] ? tilde(s.folders[j.folder]) : `~/clipper/${FOLDER[j.folder] || "Clips"}`;
-  setText($("delTitle"), `Delete “${n.title.length > 60 ? `${n.title.slice(0, 57)}…` : n.title}”?`);
-  setText($("delText"), `This removes the file from ${where}. It doesn't go to the Bin.`);
+  const name = n.title.length > 60 ? `${n.title.slice(0, 57)}…` : n.title, bin = canTrash(), ok = $("delOk");
+  setText($("delTitle"), bin ? `Move “${name}” to the Bin?` : `Delete “${name}”?`);
+  setText($("delText"), bin ? "You can put it back from the Bin in Finder."
+                            : `This removes the file from ${where} for good. It doesn't go to the Bin.`);
+  setText(ok, bin ? "Move to Bin" : "Delete");
+  ok.className = `btn ${bin ? "primary" : "danger-solid"}`;
   toDelete = n;
   $("deleteDlg").returnValue = "";
   $("deleteDlg").showModal();
@@ -136,7 +157,7 @@ $("deleteDlg").addEventListener("close", async () => {
     store.jobs = store.jobs.filter((x) => x.id !== n.j.id);
     render(store);
     if (s && s.used) { store.storage = s; renderStatus(s); }
-    toast(`Deleted “${n.title}”.`, "ok");
+    toast(s?.trashed ? "Moved to the Bin" : `Deleted “${n.title}”.`, "ok");
     kick();
   } catch (e) { toast(e.message, "error"); }
 });
@@ -148,6 +169,11 @@ async function makeVertical(file, btn) {
     kick();
   } catch (err) { toast(err.message, "error"); }
 }
+// Saving to a phone: say what happens to the Mac's copy right away (the download itself is the browser's).
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a[data-save]");
+  if (a) toast(saveMessage(), "ok", 7000);
+});
 $("clips").addEventListener("click", (e) => {
   const v = e.target.closest('button[data-act="vertical"]');
   if (v) return makeVertical(v.dataset.file, v);
@@ -164,7 +190,7 @@ function open(n) {
   setHidden($("viewerVideo"), audio); setHidden($("viewerAudioBox"), !audio); setHidden($("viewerNote"), true);
   setClass(dlg, "portrait", isPortrait(j)); setClass(dlg, "audio", audio);
   setText($("viewerTitle"), n.title); $("viewerTitle").title = j.file;
-  $("viewerDl").href = `/clips/${f}`;
+  setSaveLink($("viewerDl"), j.file);
   $("viewerVert").hidden = audio || j.file.endsWith("_9x16.mp4"); $("viewerVert").dataset.file = j.file;
   if (!audio) media.poster = `/clips/${f}/thumb.jpg`;
   media.src = `/clips/${f}`;

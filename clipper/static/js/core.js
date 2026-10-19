@@ -74,8 +74,18 @@ export async function api(path, opts = {}) {
   try { res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts }); }
   catch { throw new Error("Can't reach Clipper. Is it still running?"); }
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401) notConnected(errorMessage(body.detail, ""));
   if (!res.ok) throw new Error(errorMessage(body.detail, res.statusText || `Error ${res.status}`));
   return body;
+}
+// A phone or iPad without the private link gets 401s: say so once and stop polling.
+let disconnected = false;
+export function notConnected(message) {
+  if (disconnected) return;
+  disconnected = true;
+  stopPolling();
+  document.dispatchEvent(new CustomEvent("clipper:unauthorized", {
+    detail: message || "This device isn't connected to Clipper. Scan the QR code in Clipper's settings on your Mac." }));
 }
 export const post = (path, data) => api(path, { method: "POST", body: JSON.stringify(data || {}) });
 
@@ -83,6 +93,7 @@ export const post = (path, data) => api(path, { method: "POST", body: JSON.strin
 export function toast(msg, kind = "info", ms = kind === "error" ? 6500 : 2800) {
   const box = $("toasts"), t = el("div", `toast ${kind}`, msg);
   if (kind === "error") t.setAttribute("role", "alert");
+  t.title = "Tap to dismiss"; t.onclick = () => t.remove();  // so a toast never blocks a tap for long
   box.appendChild(t);
   while (box.children.length > 3) box.firstElementChild.remove();
   setTimeout(() => t.remove(), ms);
@@ -115,7 +126,8 @@ export const go = (view) => { if (location.hash !== `#/${view}`) location.hash =
 // -- polling --------------------------------------------------------------------------
 // One request per tick for recorders + jobs. Fast while something is recording or
 // being made, backing off to 10s when idle, paused while the tab is hidden.
-export const store = { recs: [], jobs: [], recording: 0, running: 0, offline: false };
+// client.local is false on a phone or iPad using this Mac as its Clipper.
+export const store = { recs: [], jobs: [], recording: 0, running: 0, offline: false, storage: null, client: { local: true } };
 const listeners = [];
 export const onState = (fn) => listeners.push(fn);
 
@@ -124,6 +136,11 @@ let pollTimer = 0, inflight = false, again = false, stopped = false, idle = 0, l
 async function fetchState() {
   if (useState) {
     const res = await fetch("/api/state", { cache: "no-store" });
+    if (res.status === 401) {
+      const body = await res.json().catch(() => ({}));
+      notConnected(typeof body.detail === "string" ? body.detail : "");
+      throw new Error("not connected");
+    }
     if (res.status !== 404) { if (!res.ok) throw new Error(res.statusText); return res.text(); }
     useState = false;  // older server without /api/state
   }
@@ -156,7 +173,7 @@ export async function refresh() {
     if (text !== lastText) {
       lastText = text;
       const s = JSON.parse(text);
-      store.recs = s.live; store.jobs = s.jobs; store.storage = s.storage || null;
+      store.recs = s.live; store.jobs = s.jobs; store.storage = s.storage || null; store.client = s.client || { local: true };
       store.recording = s.live.filter((r) => r.status === "recording").length;
       store.running = s.jobs.filter((j) => j.status === "running").length;
       changed = true;
@@ -228,4 +245,14 @@ export function prettySource(src) {
     const v = u.searchParams.get("v");
     return u.hostname.replace(/^www\./, "") + (u.pathname === "/" ? "" : u.pathname) + (v ? `?v=${v}` : "");
   } catch { return src; }
+}
+
+// -- an in-page "are you sure?" -----------------------------------------------------------
+export function confirmBox({ title, text, ok = "OK", danger = false }) {
+  const dlg = $("confirmDlg");
+  setText($("cfTitle"), title); setText($("cfText"), text); setText($("cfOk"), ok);
+  $("cfOk").className = `btn ${danger ? "danger-solid" : "primary"}`;
+  dlg.returnValue = "";
+  dlg.showModal();
+  return new Promise((done) => dlg.addEventListener("close", () => done(dlg.returnValue === "ok"), { once: true }));
 }

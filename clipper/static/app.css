@@ -181,7 +181,7 @@ main.wrap { padding-bottom:64px; }
 .linkbar:focus-within { background:var(--surface); border-color:var(--line-3); box-shadow:0 0 0 4px var(--surface-3); }
 .linkbar input { flex:1; min-width:0; height:48px; padding:0 12px; border:0; background:transparent; font-size:16.5px; outline:none; }
 .linkbar input::placeholder { color:var(--text-3); }
-.linkbar input:placeholder-shown ~ #linkClear { display:none; }
+.linkbar input:placeholder-shown ~ #linkClear, .linkbar input:placeholder-shown ~ #dlClear { display:none; }
 .msg { font-size:14px; color:var(--err-fg); white-space:pre-line; }
 .msg:empty { display:none; }
 #linkMsg { margin-top:10px; }
@@ -638,6 +638,72 @@ button.pill:hover { filter:brightness(.97); border-color:var(--line-2); }
 #deleteDlg h2 { font-size:19px; font-weight:650; overflow-wrap:anywhere; }
 #deleteDlg p { margin-top:8px; color:var(--text-2); overflow-wrap:anywhere; }
 
+/* ---------- phone & iPad (this page used from another device) ---------- */
+body.remote .mac-only { display:none !important; }
+body.remote .st-row-path, body.remote .st-main { display:none; }  /* Mac paths mean nothing on a phone */
+body:not(.remote) .remote-only { display:none !important; }
+.remote-pill { height:26px; flex:none; }
+body.remote #offline { display:none !important; }  /* the remote pill says it */
+.viewer-hint { padding:10px 18px; font-size:13.5px; color:var(--text-2); background:var(--surface-2); border-top:1px solid var(--line); }
+.rm { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:18px; align-items:start; padding:16px; border-radius:var(--r-md); border:1px solid var(--line); }
+.rm-qr { background:#fff; padding:10px; border-radius:12px; border:1px solid #e5e5e5; line-height:0; }
+.rm-qr img { width:180px; height:180px; image-rendering:pixelated; }
+.rm-info { display:grid; gap:10px; min-width:0; justify-items:start; }
+.rm-info .label { margin:4px 0 0; }
+.rm-steps { margin:0; padding-left:20px; display:grid; gap:4px; color:var(--text); }
+.rm-link { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; }
+.rm-link code { flex:1 1 200px; min-width:0; padding:8px 10px; border-radius:8px; background:var(--surface-2); border:1px solid var(--line); font-size:12.5px; overflow-wrap:anywhere; }
+.rm-link.alt code { font-size:12px; color:var(--text-2); }
+.rm-alt-label { width:100%; font-size:12.5px; color:var(--text-3); }
+#remoteSection .toggle.big { width:100%; }
+.rec-tag { font:500 10.5px/1 var(--f-mono); font-style:normal; margin-left:6px; letter-spacing:.08em; text-transform:uppercase; color:var(--ok-fg); background:var(--ok-bg); padding:3px 7px; border-radius:999px; vertical-align:1px; }
+.rm-unreachable code { font-size:12.5px; }
+.st-opt b { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+#confirmDlg { width:min(420px, calc(100% - 32px)); padding:24px; }
+#confirmDlg h2 { font-size:19px; font-weight:650; }
+#confirmDlg p { margin-top:8px; color:var(--text-2); }
+.not-connected .nc-msg { max-width:44ch; margin:10px auto 0; }
+.nc-steps { text-align:left; max-width:40ch; margin:22px auto 26px; color:var(--text-2); }
+
+/* home-screen app: keep clear of the notch and the home indicator */
+.appbar { padding-top:env(safe-area-inset-top); }
+
+/* touch screens: bigger targets, nothing that needs hover */
+@media (pointer: coarse) {
+  .btn, .btn.sm, .chip, .nav a, .linkbar .btn, .dl-choice, .st-opt { min-height:44px; }
+  .btn.icon { min-width:44px; }
+  .seg span { padding:11px 16px; }
+  .chip-custom .input, .input { min-height:44px; }
+  .m-check { padding:6px; margin:-6px; }
+  .m-check input, .dl-item input, .dl-choice input, .st-opt input { width:22px; height:22px; }
+  .dl-item { min-height:56px; }
+  input[type=range] { height:36px; }
+  .tl-handle { width:28px; margin-left:-14px; }
+  .tl-track { height:58px; }
+  #hlGraph { height:190px; }
+  .toggle .sw { width:44px; height:26px; border-radius:13px; }
+  .toggle .sw::after { width:20px; height:20px; }
+  .toggle input:checked ~ .sw::after { transform:translateX(18px); }
+  .mon-tools .btn, .clip-acts .btn { min-height:44px; }
+}
+@media (hover: none) {
+  .clip.done .thumb .play { opacity:.92; transform:none; }
+  .clip.done:hover { transform:none; }
+}
+/* iPad and small laptops: room for the top tabs without crowding */
+@media (min-width:701px) and (max-width:1100px) {
+  .appbar-row { gap:12px; }
+  .nav { margin-left:0; }
+  .nav a { padding:0 12px; }
+  .nav-ico { display:none; }
+  .appbar .storage-pill { display:none !important; }  /* it's on My clips */
+  .logo-word { font-size:25px; }
+}
+@media (min-width:701px) and (max-width:860px) {
+  .nav a { padding:0 10px; font-size:13.5px; }
+  .appbar-right .btn.quiet.sm:not(.icon) { padding:5px 8px; }
+}
+
 /* ---------- small screens ---------- */
 @media (max-width:860px) {
   .clipbar { grid-template-columns:repeat(2, minmax(0, 1fr)); }
@@ -665,6 +731,8 @@ button.pill:hover { filter:brightness(.97); border-color:var(--line-2); }
   .source-thumb { width:92px; }
 }
 @media (max-width:520px) {
+  .rm { grid-template-columns:1fr; justify-items:center; }
+  .rm-info { justify-items:stretch; }
   .appbar .storage-pill { display:none !important; }
   .appbar-right { gap:0; }
   .st { padding:18px; }

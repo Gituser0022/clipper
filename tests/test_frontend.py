@@ -242,3 +242,46 @@ def test_storage_settings_are_wired():
     assert 'value="stop"' in html and 'value="delete_oldest"' in html
     assert html.count('class="full-banner') == 3  # Make a clip, Download, Recording
     assert "/api/clips/" in js["clips.js"] and 'method: "DELETE"' in js["clips.js"]
+
+
+# -- phone & iPad: what the page itself needs from a phone's point of view ---------------
+
+def _paired_phone():
+    from clipper import storage
+    mac = TestClient(server.app)
+    mac.put("/api/remote", json={"enabled": True})
+    key = storage.load_settings(server.HOME)["remote_key"]
+    phone = TestClient(server.app, client=("192.168.1.50", 5555), follow_redirects=False)
+    assert phone.get(f"/?key={key}").status_code == 303
+    return phone
+
+
+def test_unpaired_phone_gets_a_message_the_page_can_show():
+    phone = TestClient(server.app, client=("192.168.1.50", 5555), follow_redirects=False)
+    r = phone.get("/api/state")
+    assert r.status_code == 401 and isinstance(r.json()["detail"], str) and "QR code" in r.json()["detail"]
+
+
+def test_paired_phone_gets_the_whole_app():
+    phone = _paired_phone()
+    assert phone.get("/api/state").json()["client"] == {"local": False}
+    for path in ("/", "/app.css", "/js/main.js", "/js/remote.js", "/fonts/geist-latin.woff2",
+                 "/manifest.webmanifest", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png", "/icon.svg"):
+        assert phone.get(path).status_code == 200, path
+    assert phone.post("/api/quit").status_code == 403  # the page hides Quit for phones; the server agrees
+
+
+def test_home_screen_app_files():
+    static, html, _ = page_sources()
+    man = json.loads((static / "manifest.webmanifest").read_text())
+    assert man["name"] == "Clipper" and man["display"] == "standalone"
+    sizes = {i["sizes"] for i in man["icons"]}
+    assert {"192x192", "512x512"} <= sizes
+    for icon in man["icons"]:
+        assert (static / icon["src"]).is_file(), icon["src"]
+    import struct
+    for name, px in (("icon-192.png", 192), ("icon-512.png", 512), ("apple-touch-icon.png", 180)):
+        head = (static / name).read_bytes()[:24]  # PNG signature, then the IHDR chunk with width/height
+        assert head[:8] == b"\x89PNG\r\n\x1a\n" and struct.unpack(">II", head[16:24]) == (px, px), name
+    assert 'rel="manifest"' in html and 'rel="apple-touch-icon"' in html and "apple-mobile-web-app-capable" in html
+    assert "viewport-fit=cover" in html and "safe-area-inset" in (static / "app.css").read_text()
